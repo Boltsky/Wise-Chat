@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.wisechat.app.WiseChatApp
 import com.wisechat.app.data.local.entity.HistoryEntity
+import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.domain.model.*
 import com.wisechat.app.engine.ocr.MlKitOcrEngine
 import com.wisechat.app.engine.provider.GenerateRepliesParams
@@ -54,6 +55,30 @@ class WiseChatViewModel(application: Application) : AndroidViewModel(application
 
     val historyEntries: StateFlow<List<HistoryEntity>> = app.historyRepository.getAllHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val themeMode: StateFlow<ThemeMode> = app.preferencesManager.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            app.preferencesManager.setThemeMode(mode)
+        }
+    }
+
+    fun disconnectActiveProvider() {
+        viewModelScope.launch {
+            val current = _uiState.value.activeProvider
+            if (current != null) {
+                app.secureStorage.removeApiKey(current.id)
+                val updated = current.copy(isEnabled = false)
+                app.providerRepository.saveProvider(updated)
+                observeActiveProvider()
+                _uiState.update {
+                    it.copy(successMessage = "Disconnected ${current.name} and removed API key.")
+                }
+            }
+        }
+    }
 
     init {
         checkOverlayStatus()

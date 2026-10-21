@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.ui.WiseChatViewModel
 import com.wisechat.app.ui.navigation.Routes
 import com.wisechat.app.ui.navigation.WiseChatNavHost
@@ -39,8 +40,12 @@ class MainActivity : ComponentActivity() {
             val startDestination = if (onboardingCompleted) Routes.HOME else Routes.ONBOARDING
 
             setContent {
-                val darkThemePref by app.preferencesManager.isDarkTheme.collectAsState(initial = null)
-                val useDarkTheme = darkThemePref ?: isSystemInDarkTheme()
+                val themeMode by app.preferencesManager.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
+                val useDarkTheme = when (themeMode) {
+                    ThemeMode.DARK -> true
+                    ThemeMode.LIGHT -> false
+                    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                }
 
                 WiseChatTheme(darkTheme = useDarkTheme) {
                     Surface(

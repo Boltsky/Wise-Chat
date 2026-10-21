@@ -3,6 +3,9 @@ package com.wisechat.app.overlay
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
+import android.os.Handler
+import android.os.Looper
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -22,7 +25,11 @@ class OverlayBubbleView(
     context: Context,
     private val windowManager: WindowManager,
     private val layoutParams: WindowManager.LayoutParams,
-    private val onBubbleClicked: () -> Unit
+    private val onBubbleClicked: () -> Unit,
+    private val onShowDismissTarget: () -> Unit = {},
+    private val onHideDismissTarget: () -> Unit = {},
+    private val onCheckHoverDismissTarget: (bubbleX: Float, bubbleY: Float) -> Boolean = { _, _ -> false },
+    private val onDismiss: () -> Unit = {}
 ) : View(context) {
 
     init {
@@ -61,7 +68,16 @@ class OverlayBubbleView(
     private var touchStartX = 0f
     private var touchStartY = 0f
     private var isDragging = false
-    private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop.toFloat().coerceAtLeast(20f)
+    private var isLongPressed = false
+    private var wasHovered = false
+    private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop.toFloat().coerceAtLeast(16f)
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val longPressRunnable = Runnable {
+        isLongPressed = true
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        onShowDismissTarget()
+    }
 
     var visualState: BubbleVisualState = BubbleVisualState.IDLE
         set(value) {
@@ -108,7 +124,6 @@ class OverlayBubbleView(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // Bubble touch target: 60dp standard size
         val size = (60 * resources.displayMetrics.density).toInt()
         setMeasuredDimension(size, size)
     }
@@ -144,6 +159,11 @@ class OverlayBubbleView(
                 touchStartX = event.rawX
                 touchStartY = event.rawY
                 isDragging = false
+                isLongPressed = false
+                wasHovered = false
+
+                // Schedule long-press detection
+                mainHandler.postDelayed(longPressRunnable, 350)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -151,24 +171,52 @@ class OverlayBubbleView(
                 val dy = event.rawY - touchStartY
                 if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
                     isDragging = true
+                    // Show dismiss target as soon as drag begins
+                    onShowDismissTarget()
                 }
+
                 if (isDragging) {
                     layoutParams.x = (initialX + dx).toInt()
                     layoutParams.y = (initialY + dy).toInt()
                     try {
                         windowManager.updateViewLayout(this, layoutParams)
                     } catch (_: Exception) {}
+
+                    // Check if bubble is hovering over dismiss target
+                    val bubbleCenterX = layoutParams.x + width / 2f
+                    val bubbleCenterY = layoutParams.y + height / 2f
+                    val isHovered = onCheckHoverDismissTarget(bubbleCenterX, bubbleCenterY)
+                    if (isHovered && !wasHovered) {
+                        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    }
+                    wasHovered = isHovered
                 }
                 return true
             }
-            MotionEvent.ACTION_UP -> {
-                val totalDx = abs(event.rawX - touchStartX)
-                val totalDy = abs(event.rawY - touchStartY)
-                if (!isDragging || (totalDx < touchSlop && totalDy < touchSlop)) {
-                    onBubbleClicked()
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                mainHandler.removeCallbacks(longPressRunnable)
+
+                val bubbleCenterX = layoutParams.x + width / 2f
+                val bubbleCenterY = layoutParams.y + height / 2f
+                val isDroppedOnDismiss = isDragging && onCheckHoverDismissTarget(bubbleCenterX, bubbleCenterY)
+
+                if (isDroppedOnDismiss) {
+                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    onHideDismissTarget()
+                    onDismiss()
                 } else {
-                    snapToEdge()
+                    onHideDismissTarget()
+                    val totalDx = abs(event.rawX - touchStartX)
+                    val totalDy = abs(event.rawY - touchStartY)
+                    if (!isDragging && totalDx < touchSlop && totalDy < touchSlop) {
+                        onBubbleClicked()
+                    } else {
+                        snapToEdge()
+                    }
                 }
+                isDragging = false
+                isLongPressed = false
+                wasHovered = false
                 return true
             }
         }

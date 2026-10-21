@@ -12,6 +12,12 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "wise_chat_preferences")
 
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK
+}
+
 class PreferencesManager(private val context: Context) {
 
     private object PreferencesKeys {
@@ -23,6 +29,7 @@ class PreferencesManager(private val context: Context) {
         val DEFAULT_LANGUAGE = stringPreferencesKey("default_language")
         val HISTORY_ENABLED = booleanPreferencesKey("history_enabled")
         val DARK_THEME = booleanPreferencesKey("dark_theme")
+        val THEME_MODE = stringPreferencesKey("theme_mode_enum")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val ACTIVE_PROVIDER_CONFIGS = stringPreferencesKey("active_provider_configs_json")
         val CUSTOM_STYLES_JSON = stringPreferencesKey("custom_styles_json")
@@ -75,6 +82,23 @@ class PreferencesManager(private val context: Context) {
         preferences[PreferencesKeys.DARK_THEME]
     }
 
+    val themeMode: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
+        val modeStr = preferences[PreferencesKeys.THEME_MODE]
+        if (modeStr != null) {
+            try {
+                ThemeMode.valueOf(modeStr)
+            } catch (_: Exception) {
+                ThemeMode.SYSTEM
+            }
+        } else {
+            when (preferences[PreferencesKeys.DARK_THEME]) {
+                true -> ThemeMode.DARK
+                false -> ThemeMode.LIGHT
+                null -> ThemeMode.SYSTEM
+            }
+        }
+    }
+
     val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false
     }
@@ -117,6 +141,17 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setDarkTheme(isDark: Boolean) {
         context.dataStore.edit { it[PreferencesKeys.DARK_THEME] = isDark }
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.dataStore.edit {
+            it[PreferencesKeys.THEME_MODE] = mode.name
+            when (mode) {
+                ThemeMode.SYSTEM -> it.remove(PreferencesKeys.DARK_THEME)
+                ThemeMode.LIGHT -> it[PreferencesKeys.DARK_THEME] = false
+                ThemeMode.DARK -> it[PreferencesKeys.DARK_THEME] = true
+            }
+        }
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {

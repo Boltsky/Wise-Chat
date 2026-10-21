@@ -3,6 +3,7 @@ package com.wisechat.app.ui.screens.settings
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,21 +16,29 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.ui.WiseChatUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     uiState: WiseChatUiState,
+    themeMode: ThemeMode,
+    onSetThemeMode: (ThemeMode) -> Unit,
+    onNavigateToProviders: () -> Unit,
+    onDisconnectProvider: () -> Unit,
     onToggleOverlay: (Boolean) -> Unit,
     onClearHistory: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var showDisconnectDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -53,7 +62,182 @@ fun SettingsScreen(
         ) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            // Overlay Settings
+            // --- AI Engine & Connected Account ---
+            item {
+                Text(
+                    text = "AI Engine & Connected Account",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            item {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = uiState.activeProvider?.name ?: "No Provider Active",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Model: ${uiState.activeProvider?.model ?: "None"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            val isConfigured = uiState.activeProvider?.isEnabled == true
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isConfigured) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.errorContainer
+                                }
+                            ) {
+                                Text(
+                                    text = if (isConfigured) "Connected ●" else "Not Configured ⚠️",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isConfigured) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    },
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onNavigateToProviders,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Modify Engine", fontSize = 12.sp)
+                            }
+
+                            if (uiState.activeProvider != null) {
+                                OutlinedButton(
+                                    onClick = { showDisconnectDialog = true },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.LinkOff, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Disconnect Key", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Appearance & Theme ---
+            item {
+                Text(
+                    text = "Appearance & Theme",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            item {
+                Card(shape = RoundedCornerShape(14.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "Choose App Theme",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Applies to both Wise Chat application and the floating overlay",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val options = listOf(
+                                Triple(ThemeMode.SYSTEM, "System", Icons.Default.SettingsBrightness),
+                                Triple(ThemeMode.LIGHT, "Light", Icons.Default.LightMode),
+                                Triple(ThemeMode.DARK, "Dark", Icons.Default.DarkMode)
+                            )
+
+                            options.forEach { (mode, label, icon) ->
+                                val isSelected = themeMode == mode
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { onSetThemeMode(mode) }
+                                        .border(
+                                            width = if (isSelected) 2.dp else 1.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                            shape = RoundedCornerShape(10.dp)
+                                        ),
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surface
+                                    }
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Floating Assistant Settings ---
             item {
                 Text(
                     text = "Floating Assistant",
@@ -105,7 +289,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Privacy & Data Security
+            // --- Privacy & Data Security ---
             item {
                 Text(
                     text = "Privacy & Security Principles",
@@ -143,7 +327,7 @@ fun SettingsScreen(
                             Column {
                                 Text("Hardware Keystore Encryption", fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    "Your personal API keys are encrypted using Android Keystore AES-256 GCM. Keys are never transmitted to our servers.",
+                                    "Your personal API keys are encrypted using Android Keystore AES-256 GCM. Keys are never transmitted to any Wise Chat server.",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
@@ -164,7 +348,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Data Retention & Clear
+            // --- Data Retention & Clear ---
             item {
                 Text(
                     text = "Data Management",
@@ -198,7 +382,7 @@ fun SettingsScreen(
                 }
             }
 
-            // App Info
+            // --- App Info ---
             item {
                 Column(
                     modifier = Modifier
@@ -241,6 +425,32 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearHistoryDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showDisconnectDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectDialog = false },
+            title = { Text("Disconnect Account & Erase Key?") },
+            text = {
+                Text("This will securely erase the saved API credentials for ${uiState.activeProvider?.name ?: "this provider"} from your hardware Keystore. You will need to re-enter your key to generate replies.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDisconnectProvider()
+                        showDisconnectDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Disconnect & Erase")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisconnectDialog = false }) {
                     Text("Cancel")
                 }
             }

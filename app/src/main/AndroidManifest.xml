@@ -69,6 +69,18 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <!-- Quick Settings Tile -->
+        <service
+            android:name=".service.WiseChatTileService"
+            android:icon="@drawable/ic_notification"
+            android:label="Wise Chat"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>

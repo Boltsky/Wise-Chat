@@ -50,6 +50,7 @@ fun OverlayPanelContent(
     onTargetMessageChanged: (String) -> Unit,
     onGenerateClicked: () -> Unit,
     onRegenerateClicked: () -> Unit,
+    onOpenFullAppClicked: () -> Unit = {},
     onMinimizeClicked: () -> Unit,
     onCloseClicked: () -> Unit,
     onCopySuggestion: ((ReplySuggestion) -> Unit)? = null
@@ -125,6 +126,17 @@ fun OverlayPanelContent(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onOpenFullAppClicked,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = "Open Wise Chat App",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     if (conversationContext != null && !isAnalyzing) {
                         IconButton(
                             onClick = onRescanClicked,
@@ -256,6 +268,18 @@ fun OverlayPanelContent(
                         Icon(Icons.Default.CropFree, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Analyze Current Chat", fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onOpenFullAppClicked,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Open Full Wise Chat App", fontSize = 13.sp)
                     }
                 }
             } else {

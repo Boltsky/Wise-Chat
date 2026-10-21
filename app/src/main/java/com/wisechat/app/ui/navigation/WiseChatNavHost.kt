@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.ui.WiseChatViewModel
 import com.wisechat.app.ui.screens.analysis.AnalysisScreen
 import com.wisechat.app.ui.screens.customstyles.CustomStylesScreen
@@ -131,8 +132,13 @@ fun WiseChatNavHost(
         }
 
         composable(Routes.SETTINGS) {
+            val themeMode by viewModel.themeMode.collectAsState()
             SettingsScreen(
                 uiState = uiState,
+                themeMode = themeMode,
+                onSetThemeMode = { viewModel.setThemeMode(it) },
+                onNavigateToProviders = { navController.navigate(Routes.PROVIDERS) },
+                onDisconnectProvider = { viewModel.disconnectActiveProvider() },
                 onToggleOverlay = { viewModel.setOverlayEnabled(it) },
                 onClearHistory = { viewModel.clearAllHistory() },
                 onNavigateBack = { navController.popBackStack() }

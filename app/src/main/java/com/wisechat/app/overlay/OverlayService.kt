@@ -16,6 +16,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -28,17 +30,20 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.wisechat.app.MainActivity
 import com.wisechat.app.R
 import com.wisechat.app.WiseChatApp
 import com.wisechat.app.capture.CaptureEvent
 import com.wisechat.app.capture.ScreenCapturePermissionActivity
 import com.wisechat.app.capture.ScreenCaptureService
+import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.domain.model.*
 import com.wisechat.app.engine.ocr.MlKitOcrEngine
 import com.wisechat.app.engine.provider.GenerateRepliesParams
 import com.wisechat.app.ui.theme.WiseChatTheme
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import kotlin.math.hypot
 
 class OverlayService : Service() {
 
@@ -48,6 +53,10 @@ class OverlayService : Service() {
 
     private var bubbleView: OverlayBubbleView? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
+
+    private var dismissTargetView: OverlayDismissTargetView? = null
+    private var dismissTargetParams: WindowManager.LayoutParams? = null
+    private var isDismissTargetAttached = false
 
     private var panelView: View? = null
     private var panelParams: WindowManager.LayoutParams? = null
@@ -75,6 +84,7 @@ class OverlayService : Service() {
         try {
             if (Settings.canDrawOverlays(this)) {
                 initBubbleView()
+                initDismissTargetView()
                 listenToCaptureEvents()
             } else {
                 Toast.makeText(this, "Overlay permission not granted", Toast.LENGTH_SHORT).show()
@@ -110,6 +120,61 @@ class OverlayService : Service() {
         }
     }
 
+    private fun initDismissTargetView() {
+        val layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        val density = resources.displayMetrics.density
+
+        dismissTargetParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            layoutFlag,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = (24 * density).toInt()
+        }
+
+        dismissTargetView = OverlayDismissTargetView(this)
+    }
+
+    private fun showDismissTarget() {
+        if (!isDismissTargetAttached && dismissTargetView != null && dismissTargetParams != null) {
+            try {
+                windowManager.addView(dismissTargetView, dismissTargetParams)
+                isDismissTargetAttached = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to show dismiss target", e)
+            }
+        }
+    }
+
+    private fun hideDismissTarget() {
+        if (isDismissTargetAttached && dismissTargetView != null) {
+            try {
+                dismissTargetView?.isDismissHovered = false
+                windowManager.removeView(dismissTargetView)
+                isDismissTargetAttached = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to hide dismiss target", e)
+            }
+        }
+    }
+
+    private fun checkHoverDismissTarget(bubbleX: Float, bubbleY: Float): Boolean {
+        val metrics = resources.displayMetrics
+        val density = metrics.density
+        val targetCenterX = metrics.widthPixels / 2f
+        val targetCenterY = metrics.heightPixels - (50 * density)
+
+        val distance = hypot(bubbleX - targetCenterX, bubbleY - targetCenterY)
+        val isHovered = distance < (95 * density)
+        dismissTargetView?.isDismissHovered = isHovered
+        return isHovered
+    }
+
     private fun initBubbleView() {
         val layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
@@ -126,9 +191,31 @@ class OverlayService : Service() {
             y = 350
         }
 
-        bubbleView = OverlayBubbleView(this, windowManager, bubbleParams!!) {
-            toggleOverlayPanel()
-        }
+        val app = application as WiseChatApp
+        bubbleView = OverlayBubbleView(
+            context = this,
+            windowManager = windowManager,
+            layoutParams = bubbleParams!!,
+            onBubbleClicked = {
+                toggleOverlayPanel()
+            },
+            onShowDismissTarget = {
+                showDismissTarget()
+            },
+            onHideDismissTarget = {
+                hideDismissTarget()
+            },
+            onCheckHoverDismissTarget = { bx, by ->
+                checkHoverDismissTarget(bx, by)
+            },
+            onDismiss = {
+                hideDismissTarget()
+                serviceScope.launch {
+                    app.preferencesManager.setOverlayEnabled(false)
+                }
+                stopSelf()
+            }
+        )
 
         try {
             windowManager.addView(bubbleView, bubbleParams)
@@ -159,7 +246,14 @@ class OverlayService : Service() {
         }
 
         composeView.setContent {
-            WiseChatTheme {
+            val themeMode by app.preferencesManager.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
+            val useDarkTheme = when (themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+
+            WiseChatTheme(darkTheme = useDarkTheme) {
                 OverlayPanelContent(
                     isAnalyzing = isAnalyzing,
                     isGenerating = isGenerating,
@@ -195,6 +289,13 @@ class OverlayService : Service() {
                     },
                     onRegenerateClicked = {
                         generateReplies()
+                    },
+                    onOpenFullAppClicked = {
+                        val intent = Intent(this@OverlayService, MainActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        }
+                        startActivity(intent)
+                        hideOverlayPanel()
                     },
                     onMinimizeClicked = {
                         hideOverlayPanel()
@@ -256,6 +357,7 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM
+            @Suppress("DEPRECATION")
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
 
@@ -301,8 +403,8 @@ class OverlayService : Service() {
         hideOverlayPanel()
 
         // If Wise Chat's main activity is open in foreground, minimize it to reveal the messaging app underneath
-        if (com.wisechat.app.MainActivity.isResumed) {
-            com.wisechat.app.MainActivity.instance?.moveTaskToBack(true)
+        if (MainActivity.isResumed) {
+            MainActivity.instance?.moveTaskToBack(true)
         }
 
         bubbleView?.visualState = BubbleVisualState.ANALYZING
@@ -349,16 +451,23 @@ class OverlayService : Service() {
 
     private fun generateReplies() {
         val context = currentContext ?: return
-        val app = application as WiseChatApp
-
         isGenerating = true
         errorMessage = null
+        bubbleView?.visualState = BubbleVisualState.ANALYZING
 
         serviceScope.launch {
+            val app = application as WiseChatApp
             val params = GenerateRepliesParams(
                 conversationContext = context,
-                styleOptions = StyleCustomization(selectedStyle = selectedStyle)
+                styleOptions = StyleCustomization(
+                    selectedStyle = selectedStyle,
+                    intensity = ToneIntensity.BALANCED,
+                    length = ReplyLength.SHORT,
+                    emojiUsage = EmojiUsage.OCCASIONAL,
+                    language = "English"
+                )
             )
+
             val result = app.providerCoordinator.generateReplies(params)
             isGenerating = false
 
@@ -366,7 +475,7 @@ class OverlayService : Service() {
                 suggestions = response.suggestions
                 bubbleView?.visualState = BubbleVisualState.SUCCESS
             }.onFailure { ex ->
-                errorMessage = ex.localizedMessage ?: "Failed to generate replies"
+                errorMessage = ex.localizedMessage ?: "Failed to generate suggestions"
                 bubbleView?.visualState = BubbleVisualState.ERROR
             }
         }
@@ -395,6 +504,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         serviceScope.cancel()
+        hideDismissTarget()
         try {
             if (bubbleView != null) windowManager.removeView(bubbleView)
             if (isPanelOpen && panelView != null) windowManager.removeView(panelView)
