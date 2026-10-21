@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Chat bubble background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,32 C27.6,32 24,35.6 24,40 L24,68 C24,72.4 27.6,76 32,76 L40,76 L40,84 L52,76 L76,76 C80.4,76 84,72.4 84,68 L84,40 C84,35.6 80.4,32 76,32 Z" />
+    <!-- AI Sparkle / Brain star in center -->
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M54,42 L56.5,49.5 L64,52 L56.5,54.5 L54,62 L51.5,54.5 L44,52 L51.5,49.5 Z" />
+    <path
+        android:fillColor="#4F46E5"
+        android:pathData="M66,40 L67.2,43.8 L71,45 L67.2,46.2 L66,50 L64.8,46.2 L61,45 L64.8,43.8 Z" />
+</vector>

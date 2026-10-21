@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Wise Chat</string>
+    <string name="tagline">Think smarter. Reply better.</string>
+    <string name="overlay_service_channel_name">Wise Chat Floating Assistant</string>
+    <string name="overlay_service_channel_desc">Keeps the Wise Chat floating bubble accessible above apps</string>
+    <string name="capture_service_channel_name">Screen Capture</string>
+    <string name="capture_service_channel_desc">Performs authorized screen capture for conversation analysis</string>
+</resources>

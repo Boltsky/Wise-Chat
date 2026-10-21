@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_indigo">#4F46E5</color>
+    <color name="primary_dark_indigo">#3730A3</color>
+    <color name="accent_violet">#8B5CF6</color>
+    <color name="surface_dark">#0F172A</color>
+    <color name="surface_light">#F8FAFC</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+</resources>
