@@ -30,7 +30,13 @@ class ScreenCapturePermissionActivity : Activity() {
         if (!hasRequested) {
             hasRequested = true
             try {
-                val captureIntent = projectionManager.createScreenCaptureIntent()
+                val captureIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    projectionManager.createScreenCaptureIntent(
+                        android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay()
+                    )
+                } else {
+                    projectionManager.createScreenCaptureIntent()
+                }
                 startActivityForResult(captureIntent, REQUEST_CODE_CAPTURE)
             } catch (e: Exception) {
                 ScreenCaptureService.notifyCaptureError("Failed to initiate screen capture: ${e.message}")

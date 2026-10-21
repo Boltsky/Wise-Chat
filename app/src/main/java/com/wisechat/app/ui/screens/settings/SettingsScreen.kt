@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wisechat.app.accessibility.WiseChatAccessibilityService
 import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.ui.WiseChatUiState
 
@@ -284,6 +285,91 @@ fun SettingsScreen(
                             Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("System Overlay Settings")
+                        }
+                    }
+                }
+            }
+
+            // --- Screen Capture Mode ---
+            item {
+                Text(
+                    text = "Screen Capture & OCR",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            item {
+                val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                var isAccessibilityActive by remember {
+                    mutableStateOf(WiseChatAccessibilityService.isServiceRunning || WiseChatAccessibilityService.isAccessibilityEnabled(context))
+                }
+                DisposableEffect(lifecycleOwner) {
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                            isAccessibilityActive = WiseChatAccessibilityService.isServiceRunning || WiseChatAccessibilityService.isAccessibilityEnabled(context)
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
+
+                Card(shape = RoundedCornerShape(14.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Zero-Popup Instant Capture", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = if (isAccessibilityActive) {
+                                        "Active: Chat screenshots captured instantly with no system popups"
+                                    } else {
+                                        "Enable to skip the Android screen share dialog every time you reply"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isAccessibilityActive) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                }
+                            ) {
+                                Text(
+                                    text = if (isAccessibilityActive) "Active ●" else "Standard",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isAccessibilityActive) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                context.startActivity(intent)
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isAccessibilityActive) "Accessibility Settings" else "Enable Instant Capture (No Popups)")
                         }
                     }
                 }

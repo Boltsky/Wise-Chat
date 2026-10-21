@@ -5,4 +5,6 @@
     <string name="overlay_service_channel_desc">Keeps the Wise Chat floating bubble accessible above apps</string>
     <string name="capture_service_channel_name">Screen Capture</string>
     <string name="capture_service_channel_desc">Performs authorized screen capture for conversation analysis</string>
+    <string name="accessibility_service_label">Wise Chat Instant Capture</string>
+    <string name="accessibility_service_description">Enables instantaneous, zero-popup screenshot capture for Wise Chat so you can analyze conversations and generate replies without system screen share dialogs.</string>
 </resources>

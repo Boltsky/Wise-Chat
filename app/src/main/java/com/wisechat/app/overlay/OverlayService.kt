@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
@@ -33,6 +34,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.wisechat.app.MainActivity
 import com.wisechat.app.R
 import com.wisechat.app.WiseChatApp
+import com.wisechat.app.accessibility.WiseChatAccessibilityService
 import com.wisechat.app.capture.CaptureEvent
 import com.wisechat.app.capture.ScreenCapturePermissionActivity
 import com.wisechat.app.capture.ScreenCaptureService
@@ -410,8 +412,46 @@ class OverlayService : Service() {
         bubbleView?.visualState = BubbleVisualState.ANALYZING
 
         serviceScope.launch {
-            delay(250) // Allow window transition/minimization to complete before capturing screen
-            ScreenCapturePermissionActivity.launch(this@OverlayService)
+            delay(200) // Allow window transition/minimization to complete before capturing screen
+
+            val accessibilityService = WiseChatAccessibilityService.instance
+            if (accessibilityService != null) {
+                // Instant zero-popup capture!
+                accessibilityService.captureScreenshot { bitmap, error ->
+                    bubbleView?.visibility = View.VISIBLE
+                    if (bitmap != null) {
+                        processCapturedBitmap(bitmap)
+                    } else {
+                        errorMessage = error ?: "Instant capture failed"
+                        bubbleView?.visualState = BubbleVisualState.ERROR
+                        showOverlayPanel()
+                    }
+                }
+            } else {
+                // Fallback to MediaProjection (configured for default full display on Android 14+)
+                ScreenCapturePermissionActivity.launch(this@OverlayService)
+            }
+        }
+    }
+
+    private fun processCapturedBitmap(bitmap: Bitmap) {
+        isAnalyzing = true
+        errorMessage = null
+        bubbleView?.visualState = BubbleVisualState.ANALYZING
+        showOverlayPanel()
+
+        serviceScope.launch {
+            val result = ocrEngine.processImage(bitmap)
+            isAnalyzing = false
+
+            result.onSuccess { context ->
+                currentContext = context
+                bubbleView?.visualState = BubbleVisualState.SUCCESS
+                generateReplies()
+            }.onFailure { ex ->
+                errorMessage = ex.localizedMessage ?: "OCR failed to read conversation"
+                bubbleView?.visualState = BubbleVisualState.ERROR
+            }
         }
     }
 
@@ -422,22 +462,7 @@ class OverlayService : Service() {
 
                 when (event) {
                     is CaptureEvent.Success -> {
-                        isAnalyzing = true
-                        errorMessage = null
-                        bubbleView?.visualState = BubbleVisualState.ANALYZING
-                        showOverlayPanel()
-
-                        val result = ocrEngine.processImage(event.bitmap)
-                        isAnalyzing = false
-
-                        result.onSuccess { context ->
-                            currentContext = context
-                            bubbleView?.visualState = BubbleVisualState.SUCCESS
-                            generateReplies()
-                        }.onFailure { ex ->
-                            errorMessage = ex.localizedMessage ?: "OCR failed to read conversation"
-                            bubbleView?.visualState = BubbleVisualState.ERROR
-                        }
+                        processCapturedBitmap(event.bitmap)
                     }
                     is CaptureEvent.Error -> {
                         errorMessage = event.message
