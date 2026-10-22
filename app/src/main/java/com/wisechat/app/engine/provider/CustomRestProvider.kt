@@ -24,7 +24,12 @@ class CustomRestProvider(
             try {
                 val target = params.conversationContext.resolvedTargetMessage?.text ?: ""
                 val convText = params.conversationContext.messages.joinToString("\n") {
-                    "${it.sender}: ${it.text}"
+                    val speaker = when (it.sender) {
+                        SenderRole.INCOMING -> "Them"
+                        SenderRole.OUTGOING -> "You"
+                        SenderRole.UNKNOWN -> "Participant"
+                    }
+                    "$speaker: ${it.text}"
                 }
 
                 // Interpolate template variables safely

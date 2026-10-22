@@ -91,7 +91,7 @@ class StyleRepository(private val preferencesManager: PreferencesManager) {
         return listOf(
             CustomPersonaPreset(
                 name = "My Dating Persona",
-                promptDescription = "Charming, witty, charismatic, and subtly playful without seeming eager.",
+                promptDescription = "Irresistibly charming, witty push-pull banter, heart-melting sweet lines, and effortless charisma that makes them smile and blush.",
                 defaultLength = ReplyLength.SHORT,
                 defaultIntensity = ToneIntensity.BALANCED,
                 defaultEmojiUsage = EmojiUsage.OCCASIONAL

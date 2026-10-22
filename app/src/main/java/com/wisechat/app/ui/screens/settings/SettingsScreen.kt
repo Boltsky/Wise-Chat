@@ -21,7 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.wisechat.app.accessibility.WiseChatAccessibilityService
+import com.wisechat.app.capture.ScreenCaptureService
 import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.ui.WiseChatUiState
 
@@ -301,13 +301,13 @@ fun SettingsScreen(
 
             item {
                 val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-                var isAccessibilityActive by remember {
-                    mutableStateOf(WiseChatAccessibilityService.isServiceRunning || WiseChatAccessibilityService.isAccessibilityEnabled(context))
+                var isCaptureActive by remember {
+                    mutableStateOf(ScreenCaptureService.isSessionReady)
                 }
                 DisposableEffect(lifecycleOwner) {
                     val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                         if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                            isAccessibilityActive = WiseChatAccessibilityService.isServiceRunning || WiseChatAccessibilityService.isAccessibilityEnabled(context)
+                            isCaptureActive = ScreenCaptureService.isSessionReady
                         }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
@@ -324,12 +324,12 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Zero-Popup Instant Capture", fontWeight = FontWeight.SemiBold)
+                                Text("Persistent Assistant Session", fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    text = if (isAccessibilityActive) {
-                                        "Active: Chat screenshots captured instantly with no system popups"
+                                    text = if (isCaptureActive) {
+                                        "Active: Chat screenshots are captured instantly in <30ms with zero popups"
                                     } else {
-                                        "Enable to skip the Android screen share dialog every time you reply"
+                                        "Approves capture once when starting replies. Subsequent replies generate instantly without prompting."
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -337,17 +337,17 @@ fun SettingsScreen(
                             }
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = if (isAccessibilityActive) {
+                                color = if (isCaptureActive) {
                                     MaterialTheme.colorScheme.primaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.surfaceVariant
                                 }
                             ) {
                                 Text(
-                                    text = if (isAccessibilityActive) "Active ●" else "Standard",
+                                    text = if (isCaptureActive) "Active ●" else "Ready",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (isAccessibilityActive) {
+                                    color = if (isCaptureActive) {
                                         MaterialTheme.colorScheme.onPrimaryContainer
                                     } else {
                                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -357,19 +357,20 @@ fun SettingsScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        OutlinedButton(
-                            onClick = {
-                                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                                context.startActivity(intent)
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (isAccessibilityActive) "Accessibility Settings" else "Enable Instant Capture (No Popups)")
+                        if (isCaptureActive) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    ScreenCaptureService.stopSession(context)
+                                    isCaptureActive = false
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.StopCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Stop Capture Session")
+                            }
                         }
                     }
                 }

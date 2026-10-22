@@ -23,6 +23,7 @@ enum class RefinementType(val label: String, val instruction: String) {
     ADD_HUMOR("Add humor", "Infuse witty, playful humor into this exact reply."),
     MORE_DIRECT("More direct", "Make this reply punchier, clearer, and more straightforward."),
     WARMER("Warmer", "Add more warmth, kindness, and personal connection to this reply."),
+    MORE_FLIRTY("Make it flirtier", "Infuse irresistible magnetic charm, playful push-pull banter, and heart-melting sweetness that leaves them blushing and smiling."),
     MORE_CONFIDENT("More confident", "Make this reply sound completely self-assured and decisive."),
     LESS_INTENSE("Less intense", "Tone down the intensity and soften the emotional weight."),
     ADD_FOLLOWUP("Add question", "Add an engaging follow-up question to the end."),

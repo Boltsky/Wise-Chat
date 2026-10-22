@@ -24,6 +24,7 @@ enum class ConversationalObjective(val title: String, val directive: String) {
     SHOW_INTEREST("Show genuine interest", "Demonstrate that you find the topic or the other person genuinely intriguing."),
     SOUND_CONFIDENT("Sound confident", "Project strong self-assurance, decisiveness, and steady calm."),
     MAKE_THEM_LAUGH("Make them laugh", "Deliver a witty, humorous line or comical observation to spark laughter."),
+    SPARK_CHEMISTRY("Spark chemistry & butterflies", "Create magnetic flirtation, playful push-pull banter, and heart-melting charm that leaves them grinning at their screen."),
     DEESCALATE("De-escalate tension", "Reduce conflict, soothe irritation, and create a calm atmosphere of mutual respect."),
     EXPRESS_SYMPATHY("Express heartfelt sympathy", "Convey tender sorrow, care, and solidarity for what they are undergoing."),
     POLITELY_DECLINE("Politely decline", "Say no or turn down the offer graciously without ambiguity or guilt."),

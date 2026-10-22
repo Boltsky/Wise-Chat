@@ -34,7 +34,6 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.wisechat.app.MainActivity
 import com.wisechat.app.R
 import com.wisechat.app.WiseChatApp
-import com.wisechat.app.accessibility.WiseChatAccessibilityService
 import com.wisechat.app.capture.CaptureEvent
 import com.wisechat.app.capture.ScreenCapturePermissionActivity
 import com.wisechat.app.capture.ScreenCaptureService
@@ -212,6 +211,7 @@ class OverlayService : Service() {
             },
             onDismiss = {
                 hideDismissTarget()
+                ScreenCaptureService.stopSession(this@OverlayService)
                 serviceScope.launch {
                     app.preferencesManager.setOverlayEnabled(false)
                 }
@@ -414,21 +414,9 @@ class OverlayService : Service() {
         serviceScope.launch {
             delay(200) // Allow window transition/minimization to complete before capturing screen
 
-            val accessibilityService = WiseChatAccessibilityService.instance
-            if (accessibilityService != null) {
-                // Instant zero-popup capture!
-                accessibilityService.captureScreenshot { bitmap, error ->
-                    bubbleView?.visibility = View.VISIBLE
-                    if (bitmap != null) {
-                        processCapturedBitmap(bitmap)
-                    } else {
-                        errorMessage = error ?: "Instant capture failed"
-                        bubbleView?.visualState = BubbleVisualState.ERROR
-                        showOverlayPanel()
-                    }
-                }
+            if (ScreenCaptureService.isSessionReady) {
+                ScreenCaptureService.captureCurrentFrame(this@OverlayService)
             } else {
-                // Fallback to MediaProjection (configured for default full display on Android 14+)
                 ScreenCapturePermissionActivity.launch(this@OverlayService)
             }
         }
@@ -528,6 +516,7 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        ScreenCaptureService.stopSession(this)
         serviceScope.cancel()
         hideDismissTarget()
         try {

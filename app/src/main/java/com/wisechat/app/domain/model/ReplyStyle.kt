@@ -20,8 +20,8 @@ enum class ReplyStyle(
     ),
     FLIRTY(
         title = "Flirty",
-        description = "Charming, charismatic, romantic interest",
-        defaultDirective = "Express subtle or clear romantic charm, playful chemistry, and charismatic banter while remaining respectful and context-aware.",
+        description = "Magnetic charm, heart-melting banter, and butterflies",
+        defaultDirective = "Deliver irresistible charm, heart-melting sweetness, and magnetic banter that leaves the recipient grinning, blushing, and saying 'aww'. Seamlessly balance witty push-pull teasing with genuine, disarming compliments. Never sound generic, cringe, or robotic—make every reply feel effortlessly smooth, captivating, and impossible not to smile at.",
         category = StyleCategory.HUMOR_CHARM
     ),
     INQUISITIVE(
