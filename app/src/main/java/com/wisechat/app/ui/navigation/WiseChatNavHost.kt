@@ -18,6 +18,7 @@ import com.wisechat.app.ui.screens.onboarding.OnboardingScreen
 import com.wisechat.app.ui.screens.providers.ProviderConfigScreen
 import com.wisechat.app.ui.screens.replies.RepliesScreen
 import com.wisechat.app.ui.screens.settings.SettingsScreen
+import com.wisechat.app.ui.screens.starters.ConversationStartersScreen
 import com.wisechat.app.ui.screens.styles.StyleSelectorScreen
 
 object Routes {
@@ -30,6 +31,7 @@ object Routes {
     const val CUSTOM_STYLES = "custom_styles"
     const val SETTINGS = "settings"
     const val HISTORY = "history"
+    const val STARTERS = "starters"
 }
 
 @Composable
@@ -75,7 +77,8 @@ fun WiseChatNavHost(
                 onNavigateToStyles = { navController.navigate(Routes.STYLES) },
                 onNavigateToCustomStyles = { navController.navigate(Routes.CUSTOM_STYLES) },
                 onNavigateToHistory = { navController.navigate(Routes.HISTORY) },
-                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToStarters = { navController.navigate(Routes.STARTERS) }
             )
         }
 
@@ -149,6 +152,17 @@ fun WiseChatNavHost(
             HistoryScreen(
                 entries = historyEntries,
                 onDeleteEntry = { entry -> viewModel.deleteHistoryEntry(entry) },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.STARTERS) {
+            ConversationStartersScreen(
+                uiState = uiState,
+                onCategorySelected = { cat -> viewModel.selectStarterCategory(cat) },
+                onTopicChanged = { text -> viewModel.setStarterTopic(text) },
+                onGenerateClicked = { viewModel.generateStarters() },
+                onStarterCopied = { starter -> viewModel.onStarterCopied(starter) },
                 onNavigateBack = { navController.popBackStack() }
             )
         }

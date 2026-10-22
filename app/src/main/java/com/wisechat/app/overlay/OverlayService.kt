@@ -41,6 +41,7 @@ import com.wisechat.app.data.preferences.ThemeMode
 import com.wisechat.app.domain.model.*
 import com.wisechat.app.engine.ocr.MlKitOcrEngine
 import com.wisechat.app.engine.provider.GenerateRepliesParams
+import com.wisechat.app.engine.provider.GenerateStartersParams
 import com.wisechat.app.ui.theme.WiseChatTheme
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -70,6 +71,13 @@ class OverlayService : Service() {
     private var suggestions by mutableStateOf<List<ReplySuggestion>>(emptyList())
     private var selectedStyle by mutableStateOf(ReplyStyle.CASUAL)
     private var errorMessage by mutableStateOf<String?>(null)
+
+    // Starters & Pick-Up Lines State
+    private var selectedOverlayTab by mutableStateOf(OverlayTab.REPLIES)
+    private var selectedStarterCategory by mutableStateOf(StarterCategory.SWEET_AWW)
+    private var starterTopicInput by mutableStateOf("")
+    private var startersList by mutableStateOf<List<ConversationStarter>>(CuratedStartersLibrary.getByCategory(StarterCategory.SWEET_AWW))
+    private var isGeneratingStarters by mutableStateOf(false)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -263,6 +271,38 @@ class OverlayService : Service() {
                     suggestions = suggestions,
                     selectedStyle = selectedStyle,
                     errorMessage = errorMessage,
+                    selectedTab = selectedOverlayTab,
+                    selectedStarterCategory = selectedStarterCategory,
+                    startersList = startersList,
+                    isGeneratingStarters = isGeneratingStarters,
+                    starterTopicInput = starterTopicInput,
+                    onTabSelected = { tab ->
+                        selectedOverlayTab = tab
+                    },
+                    onStarterCategorySelected = { category ->
+                        selectStarterCategory(category)
+                    },
+                    onStarterTopicChanged = { topic ->
+                        starterTopicInput = topic
+                    },
+                    onGenerateStartersClicked = {
+                        generateStarters()
+                    },
+                    onCopyStarter = { starter ->
+                        serviceScope.launch {
+                            try {
+                                val provider = app.providerRepository.getActiveProvider().name
+                                app.historyRepository.saveHistory(
+                                    targetMessage = "Opener [${starter.category.title}]: ${starter.tag}",
+                                    selectedReply = starter.text,
+                                    style = starter.category.title,
+                                    providerName = provider
+                                )
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to save starter to history: ${e.message}")
+                            }
+                        }
+                    },
                     onAnalyzeScreenClicked = {
                         requestScreenCapture()
                     },
@@ -490,6 +530,38 @@ class OverlayService : Service() {
             }.onFailure { ex ->
                 errorMessage = ex.localizedMessage ?: "Failed to generate suggestions"
                 bubbleView?.visualState = BubbleVisualState.ERROR
+            }
+        }
+    }
+
+    private fun selectStarterCategory(category: StarterCategory) {
+        selectedStarterCategory = category
+        startersList = CuratedStartersLibrary.getByCategory(category)
+    }
+
+    private fun generateStarters() {
+        isGeneratingStarters = true
+        bubbleView?.visualState = BubbleVisualState.ANALYZING
+
+        serviceScope.launch {
+            val app = application as WiseChatApp
+            val params = GenerateStartersParams(
+                category = selectedStarterCategory,
+                profileOrTopic = starterTopicInput.takeIf { it.isNotBlank() }
+            )
+
+            val result = app.providerCoordinator.generateConversationStarters(params)
+            isGeneratingStarters = false
+
+            result.onSuccess { starters ->
+                if (starters.isNotEmpty()) {
+                    startersList = starters
+                }
+                bubbleView?.visualState = BubbleVisualState.SUCCESS
+            }.onFailure { ex ->
+                Log.e(TAG, "Failed to generate starters via AI: ${ex.message}")
+                startersList = CuratedStartersLibrary.getByCategory(selectedStarterCategory)
+                bubbleView?.visualState = BubbleVisualState.SUCCESS
             }
         }
     }

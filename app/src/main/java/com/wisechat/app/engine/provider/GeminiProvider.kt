@@ -148,6 +148,74 @@ class GeminiProvider(
             }
         }
 
+    override suspend fun generateConversationStarters(params: GenerateStartersParams): Result<List<ConversationStarter>> =
+        withContext(Dispatchers.IO) {
+            try {
+                if (config.apiKey.isBlank()) {
+                    return@withContext Result.failure(
+                        IllegalStateException("Gemini API key is missing. Please add your API key in Settings -> AI Providers.")
+                    )
+                }
+
+                val systemPrompt = PromptBuilder.buildStartersSystemInstruction(params.category, params.language)
+                val userContent = PromptBuilder.buildStartersUserMessage(params.category, params.profileOrTopic)
+
+                val requestJson = JSONObject().apply {
+                    put("system_instruction", JSONObject().apply {
+                        put("parts", org.json.JSONArray().put(JSONObject().put("text", systemPrompt)))
+                    })
+                    put("contents", org.json.JSONArray().put(
+                        JSONObject().apply {
+                            put("role", "user")
+                            put("parts", org.json.JSONArray().put(JSONObject().put("text", userContent)))
+                        }
+                    ))
+                    put("generationConfig", JSONObject().apply {
+                        put("responseMimeType", "application/json")
+                        put("temperature", 0.85)
+                    })
+                }
+
+                var targetModel = config.model
+                var url = "${config.baseUrl}/v1beta/models/$targetModel:generateContent?key=${config.apiKey}"
+                var request = Request.Builder()
+                    .url(url)
+                    .addHeader("x-goog-api-key", config.apiKey)
+                    .post(requestJson.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                var response = client.newCall(request).execute()
+                var body = response.body?.string() ?: ""
+
+                if (!response.isSuccessful && response.code == 404 && targetModel != "gemini-flash-lite-latest") {
+                    response.close()
+                    targetModel = "gemini-flash-lite-latest"
+                    url = "${config.baseUrl}/v1beta/models/$targetModel:generateContent?key=${config.apiKey}"
+                    request = Request.Builder()
+                        .url(url)
+                        .addHeader("x-goog-api-key", config.apiKey)
+                        .post(requestJson.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    response = client.newCall(request).execute()
+                    body = response.body?.string() ?: ""
+                }
+
+                response.use {
+                    if (!response.isSuccessful) {
+                        return@withContext Result.failure(parseHttpError(response.code, body, "Google Gemini"))
+                    }
+
+                    val root = JSONObject(body)
+                    val candidates = root.optJSONArray("candidates")
+                    val rawText = candidates?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")?.optJSONObject(0)?.optString("text") ?: ""
+                    val starters = StartersJsonParser.parse(rawText, params.category)
+                    Result.success(starters)
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     override suspend fun testConnection(): ProviderTestResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {

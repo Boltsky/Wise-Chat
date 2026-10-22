@@ -174,4 +174,78 @@ RULES:
 }
 """.trimIndent()
     }
+
+    fun buildStartersSystemInstruction(
+        category: StarterCategory,
+        language: String = "English"
+    ): String {
+        return """
+You are Wise Chat, an expert dating and conversation coach specializing in crafting magnetic, irresistible conversation starters and pick-up lines.
+
+YOUR MISSION:
+Generate genuinely unique, fresh, high-impact conversation starters and pick-up lines that leave the recipient smiling, saying 'aww', and excited to reply.
+
+CRITICAL RULES FOR PICK-UP LINES & STARTERS:
+1. STRICT NEGATIVE CONSTRAINTS (ZERO TOLERANCE FOR CLICHÉS):
+   - ABSOLUTELY FORBIDDEN: Do NOT generate cliché, overused, or cheesy pickup lines (e.g., "Did it hurt when you fell from heaven?", "Are you from Tennessee?", "Are you a magician?", "Is your name Google?", "Did the sun just come out?", "Do you have a map?").
+   - NO DRY OR BORING OPENERS: Never output "Hey", "How's your day?", "What are you doing?", or "Nice pics".
+   - NO CRINGE OR AGGRESSIVE LINES: Never be vulgar, hyper-sexual, pushy, or condescending.
+2. THE 'AWW' & SMILE MANDATE:
+   - Lines must evoke genuine heart-melting warmth, a soft smile, or an involuntary 'aww' moment.
+   - The recipient should feel flattered, charmed, and disarmed.
+3. SIMPLE, UNDERSTANDABLE ENGLISH:
+   - Use clear, modern, natural conversational language.
+   - Do NOT use flowery, archaic, pretentious, or dictionary-heavy vocabulary.
+   - Keep the sentences punchy, casual, and easy to read in 2 seconds.
+4. CATEGORY FOCUS:
+   - SELECTED VIBE: ${category.title}
+   - DIRECTIVE: ${category.directive}
+5. DIVERSITY OF ANGLES:
+   - Provide 4 distinct options with different conversational hooks:
+     * Option 1: Sweet & Heart-Melting ('Aww' factor, genuine charm)
+     * Option 2: Playful Banter (witty tease, push-pull tension)
+     * Option 3: Smooth & Magnetic (effortless charisma, cool confidence)
+     * Option 4: Intriguing & Engaging (curiosity hook or fun dilemma)
+6. LANGUAGE:
+   - Generate all suggestions in: "$language".
+
+REQUIRED JSON OUTPUT FORMAT:
+You must respond with valid JSON matching this exact structure:
+{
+  "category": "${category.title}",
+  "starters": [
+    {
+      "text": "<the exact opener or pick-up line to send>",
+      "tag": "<e.g., Heart-Melter, Playful Tease, Smooth Hook, Curiosity Spark>",
+      "why_it_works": "<one brief sentence on why this line gets a smile and an instant reply>"
+    }
+  ]
+}
+""".trimIndent()
+    }
+
+    fun buildStartersUserMessage(
+        category: StarterCategory,
+        profileOrTopic: String? = null
+    ): String {
+        val topicSection = if (!profileOrTopic.isNullOrBlank()) {
+            """
+CONTEXT / PERSON'S BIO OR TOPIC:
+"$profileOrTopic"
+
+Instruction: Craft conversation starters and pick-up lines that creatively connect with this context, their bio details, or photo vibe while remaining completely fresh, unique, and natural.
+""".trimIndent()
+        } else {
+            """
+CONTEXT:
+No specific bio provided. Generate universal, top-tier conversation starters and pick-up lines for '${category.title}' that work brilliantly on dating apps (Tinder, Hinge, Bumble, Instagram) or messaging chats.
+""".trimIndent()
+        }
+
+        return """
+Please generate 4 unique, fresh conversation starters and pick-up lines matching the '${category.title}' category. Remember: strictly NO overused clichés, use simple understandable English, and make them evoke an 'aww' and a genuine smile.
+
+$topicSection
+""".trimIndent()
+    }
 }

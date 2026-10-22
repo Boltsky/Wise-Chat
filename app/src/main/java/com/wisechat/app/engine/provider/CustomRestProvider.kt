@@ -1,6 +1,7 @@
 package com.wisechat.app.engine.provider
 
 import com.wisechat.app.domain.model.*
+import com.wisechat.app.engine.prompt.PromptBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -105,6 +106,37 @@ class CustomRestProvider(
                 }
             } catch (e: Exception) {
                 Result.failure(e)
+            }
+        }
+
+    override suspend fun generateConversationStarters(params: GenerateStartersParams): Result<List<ConversationStarter>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val prompt = PromptBuilder.buildStartersUserMessage(params.category, params.profileOrTopic)
+                val requestBody = JSONObject().apply {
+                    put("model", config.model)
+                    put("prompt", prompt)
+                    put("category", params.category.title)
+                }
+
+                val requestBuilder = Request.Builder()
+                    .url(config.baseUrl)
+                    .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+
+                if (config.apiKey.isNotBlank()) {
+                    requestBuilder.addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
+                }
+
+                client.newCall(requestBuilder.build()).execute().use { response ->
+                    val body = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        return@withContext Result.success(CuratedStartersLibrary.getByCategory(params.category).take(4))
+                    }
+                    val starters = StartersJsonParser.parse(body, params.category)
+                    Result.success(starters)
+                }
+            } catch (_: Exception) {
+                Result.success(CuratedStartersLibrary.getByCategory(params.category).take(4))
             }
         }
 

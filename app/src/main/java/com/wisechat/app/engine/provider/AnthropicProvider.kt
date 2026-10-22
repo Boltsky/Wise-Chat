@@ -135,6 +135,57 @@ class AnthropicProvider(
             }
         }
 
+    override suspend fun generateConversationStarters(params: GenerateStartersParams): Result<List<ConversationStarter>> =
+        withContext(Dispatchers.IO) {
+            try {
+                if (config.apiKey.isBlank()) {
+                    return@withContext Result.failure(
+                        IllegalStateException("Anthropic API key is missing. Please add your API key in Settings -> AI Providers.")
+                    )
+                }
+
+                val systemPrompt = PromptBuilder.buildStartersSystemInstruction(params.category, params.language)
+                val userContent = PromptBuilder.buildStartersUserMessage(params.category, params.profileOrTopic)
+
+                val requestJson = JSONObject().apply {
+                    put("model", config.model)
+                    put("max_tokens", 1024)
+                    put("system", systemPrompt)
+                    put("messages", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", userContent)
+                        })
+                    })
+                    put("temperature", 0.85)
+                }
+
+                val url = "${config.baseUrl.trimEnd('/')}/messages"
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("x-api-key", config.apiKey.trim())
+                    .addHeader("anthropic-version", "2023-06-01")
+                    .addHeader("content-type", "application/json")
+                    .post(requestJson.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        return@withContext Result.failure(parseHttpError(response.code, body, "Claude"))
+                    }
+
+                    val json = JSONObject(body)
+                    val content = json.getJSONArray("content")
+                    val rawText = content.getJSONObject(0).getString("text")
+                    val starters = StartersJsonParser.parse(rawText, params.category)
+                    Result.success(starters)
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     override suspend fun testConnection(): ProviderTestResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {

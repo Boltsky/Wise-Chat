@@ -33,7 +33,11 @@ data class WiseChatUiState(
     val isOverlayEnabled: Boolean = false,
     val isOverlayPermissionGranted: Boolean = false,
     val errorMessage: String? = null,
-    val successMessage: String? = null
+    val successMessage: String? = null,
+    val selectedStarterCategory: StarterCategory = StarterCategory.SWEET_AWW,
+    val startersList: List<ConversationStarter> = CuratedStartersLibrary.getByCategory(StarterCategory.SWEET_AWW),
+    val isGeneratingStarters: Boolean = false,
+    val starterTopicInput: String = ""
 )
 
 class WiseChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -334,5 +338,62 @@ class WiseChatViewModel(application: Application) : AndroidViewModel(application
 
     fun clearErrorMessage() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun selectStarterCategory(category: StarterCategory) {
+        _uiState.update { state ->
+            val starters = CuratedStartersLibrary.getByCategory(category)
+            state.copy(selectedStarterCategory = category, startersList = starters)
+        }
+    }
+
+    fun setStarterTopic(topic: String) {
+        _uiState.update { it.copy(starterTopicInput = topic) }
+    }
+
+    fun generateStarters() {
+        val category = _uiState.value.selectedStarterCategory
+        val topic = _uiState.value.starterTopicInput
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGeneratingStarters = true, errorMessage = null) }
+            val params = com.wisechat.app.engine.provider.GenerateStartersParams(
+                category = category,
+                profileOrTopic = topic.takeIf { it.isNotBlank() }
+            )
+            val result = app.providerCoordinator.generateConversationStarters(params)
+            result.onSuccess { starters ->
+                _uiState.update {
+                    it.copy(
+                        isGeneratingStarters = false,
+                        startersList = starters
+                    )
+                }
+            }.onFailure { ex ->
+                val curated = CuratedStartersLibrary.getByCategory(category)
+                _uiState.update {
+                    it.copy(
+                        isGeneratingStarters = false,
+                        startersList = curated,
+                        errorMessage = ex.localizedMessage ?: "Failed to generate AI openers, showing curated lines."
+                    )
+                }
+            }
+        }
+    }
+
+    fun onStarterCopied(starter: ConversationStarter) {
+        viewModelScope.launch {
+            val provider = if (starter.isAiGenerated) {
+                _uiState.value.activeProvider?.name ?: "AI Assistant"
+            } else {
+                "Wise Chat Curated Vault"
+            }
+            app.historyRepository.saveHistory(
+                targetMessage = "Opener [${starter.category.title}]",
+                selectedReply = starter.text,
+                style = starter.tag.ifBlank { starter.category.title },
+                providerName = provider
+            )
+        }
     }
 }

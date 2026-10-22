@@ -136,6 +136,59 @@ class OpenAiProvider(
             }
         }
 
+    override suspend fun generateConversationStarters(params: GenerateStartersParams): Result<List<ConversationStarter>> =
+        withContext(Dispatchers.IO) {
+            try {
+                if (config.apiKey.isBlank()) {
+                    return@withContext Result.failure(
+                        IllegalStateException("OpenAI API key is missing. Please add your API key in Settings -> AI Providers.")
+                    )
+                }
+
+                val systemPrompt = PromptBuilder.buildStartersSystemInstruction(params.category, params.language)
+                val userContent = PromptBuilder.buildStartersUserMessage(params.category, params.profileOrTopic)
+
+                val requestJson = JSONObject().apply {
+                    put("model", config.model)
+                    put("messages", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", systemPrompt)
+                        })
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", userContent)
+                        })
+                    })
+                    put("response_format", JSONObject().put("type", "json_object"))
+                    put("temperature", 0.85)
+                }
+
+                val url = "${config.baseUrl.trimEnd('/')}/chat/completions"
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
+                    .post(requestJson.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        return@withContext Result.failure(parseHttpError(response.code, body, "OpenAI"))
+                    }
+
+                    val json = JSONObject(body)
+                    val choices = json.getJSONArray("choices")
+                    val message = choices.getJSONObject(0).getJSONObject("message")
+                    val rawText = message.getString("content")
+                    val starters = StartersJsonParser.parse(rawText, params.category)
+                    Result.success(starters)
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     override suspend fun testConnection(): ProviderTestResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {

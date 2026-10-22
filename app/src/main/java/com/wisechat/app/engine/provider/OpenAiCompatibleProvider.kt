@@ -118,6 +118,54 @@ class OpenAiCompatibleProvider(
             }
         }
 
+    override suspend fun generateConversationStarters(params: GenerateStartersParams): Result<List<ConversationStarter>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val systemPrompt = PromptBuilder.buildStartersSystemInstruction(params.category, params.language)
+                val userContent = PromptBuilder.buildStartersUserMessage(params.category, params.profileOrTopic)
+
+                val requestJson = JSONObject().apply {
+                    put("model", config.model)
+                    put("messages", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", systemPrompt)
+                        })
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", userContent)
+                        })
+                    })
+                    put("temperature", 0.85)
+                }
+
+                val url = "${config.baseUrl.trimEnd('/')}/chat/completions"
+                val requestBuilder = Request.Builder()
+                    .url(url)
+                    .post(requestJson.toString().toRequestBody("application/json".toMediaType()))
+
+                if (config.apiKey.isNotBlank()) {
+                    requestBuilder.addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
+                }
+
+                client.newCall(requestBuilder.build()).execute().use { response ->
+                    val body = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        return@withContext Result.failure(RuntimeException("${config.name} error (${response.code}): $body"))
+                    }
+
+                    val json = JSONObject(body)
+                    val choices = json.getJSONArray("choices")
+                    val message = choices.getJSONObject(0).getJSONObject("message")
+                    val rawText = message.getString("content")
+                    val starters = StartersJsonParser.parse(rawText, params.category)
+                    Result.success(starters)
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     override suspend fun testConnection(): ProviderTestResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {

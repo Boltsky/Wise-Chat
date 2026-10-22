@@ -2,6 +2,8 @@ package com.wisechat.app.engine.provider
 
 import com.wisechat.app.data.repository.ProviderRepository
 import com.wisechat.app.domain.model.AiProviderConfig
+import com.wisechat.app.domain.model.ConversationStarter
+import com.wisechat.app.domain.model.CuratedStartersLibrary
 import com.wisechat.app.domain.model.ProviderType
 import com.wisechat.app.domain.model.ReplyGenerationResponse
 
@@ -47,5 +49,31 @@ class ProviderCoordinator(
         val active = providerRepository.getActiveProvider()
         val provider = createProvider(active)
         return provider.refineReply(params)
+    }
+
+    suspend fun generateConversationStarters(params: GenerateStartersParams): Result<List<ConversationStarter>> {
+        val providers = providerRepository.getProviders().filter { it.isEnabled }
+        val active = providerRepository.getActiveProvider()
+
+        val primary = createProvider(active)
+        val primaryResult = primary.generateConversationStarters(params)
+
+        if (primaryResult.isSuccess && primaryResult.getOrNull()?.isNotEmpty() == true) {
+            return primaryResult
+        }
+
+        // Secondary fallback
+        val secondary = providers.firstOrNull { it.id != active.id && it.apiKey.isNotBlank() }
+        if (secondary != null) {
+            val fallbackProvider = createProvider(secondary)
+            val fallbackResult = fallbackProvider.generateConversationStarters(params)
+            if (fallbackResult.isSuccess && fallbackResult.getOrNull()?.isNotEmpty() == true) {
+                return fallbackResult
+            }
+        }
+
+        // Curated library fallback ensures zero disappointment
+        val curated = CuratedStartersLibrary.getByCategory(params.category).take(4)
+        return Result.success(curated)
     }
 }

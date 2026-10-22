@@ -31,9 +31,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wisechat.app.domain.model.ChatMessage
 import com.wisechat.app.domain.model.ConversationContext
+import com.wisechat.app.domain.model.ConversationStarter
 import com.wisechat.app.domain.model.ReplyStyle
 import com.wisechat.app.domain.model.ReplySuggestion
 import com.wisechat.app.domain.model.SenderRole
+import com.wisechat.app.domain.model.StarterCategory
+
+enum class OverlayTab(val title: String) {
+    REPLIES("Chat Replies"),
+    STARTERS("Pick-Up & Starters")
+}
 
 @Composable
 fun OverlayPanelContent(
@@ -43,6 +50,16 @@ fun OverlayPanelContent(
     suggestions: List<ReplySuggestion>,
     selectedStyle: ReplyStyle,
     errorMessage: String?,
+    selectedTab: OverlayTab = OverlayTab.REPLIES,
+    selectedStarterCategory: StarterCategory = StarterCategory.SWEET_AWW,
+    startersList: List<ConversationStarter> = emptyList(),
+    isGeneratingStarters: Boolean = false,
+    starterTopicInput: String = "",
+    onTabSelected: (OverlayTab) -> Unit = {},
+    onStarterCategorySelected: (StarterCategory) -> Unit = {},
+    onStarterTopicChanged: (String) -> Unit = {},
+    onGenerateStartersClicked: () -> Unit = {},
+    onCopyStarter: ((ConversationStarter) -> Unit)? = null,
     onAnalyzeScreenClicked: () -> Unit,
     onRescanClicked: () -> Unit,
     onStyleSelected: (ReplyStyle) -> Unit,
@@ -57,6 +74,7 @@ fun OverlayPanelContent(
 ) {
     val context = LocalContext.current
     var copiedSuggestionId by remember { mutableStateOf<String?>(null) }
+    var copiedStarterId by remember { mutableStateOf<String?>(null) }
     var isMessagePickerExpanded by remember { mutableStateOf(false) }
     var isEditingTarget by remember { mutableStateOf(false) }
     var editedText by remember { mutableStateOf("") }
@@ -173,10 +191,228 @@ fun OverlayPanelContent(
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // --- TAB SWITCHER (Replies vs Starters) ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                OverlayTab.values().forEach { tab ->
+                    val isTabSelected = tab == selectedTab
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isTabSelected) MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent
+                            )
+                            .clickable { onTabSelected(tab) }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (tab == OverlayTab.REPLIES) Icons.Default.ChatBubbleOutline else Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = if (isTabSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = tab.title,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isTabSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isTabSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
-            // --- STATE DISPLAY ---
-            if (isAnalyzing) {
+            if (selectedTab == OverlayTab.STARTERS) {
+                // --- STARTERS & PICK-UP LINES TAB CONTENT ---
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(StarterCategory.values()) { cat ->
+                        val isCatSelected = cat == selectedStarterCategory
+                        FilterChip(
+                            selected = isCatSelected,
+                            onClick = { onStarterCategorySelected(cat) },
+                            leadingIcon = { Text(cat.iconEmoji, fontSize = 12.sp) },
+                            label = {
+                                Text(
+                                    cat.title,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Optional bio / topic personalization input
+                OutlinedTextField(
+                    value = starterTopicInput,
+                    onValueChange = onStarterTopicChanged,
+                    placeholder = {
+                        Text("Bio hook or photo topic (optional)", fontSize = 12.sp)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onGenerateStartersClicked,
+                    enabled = !isGeneratingStarters,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                ) {
+                    if (isGeneratingStarters) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Crafting Unique Openers...", fontSize = 12.sp)
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            if (starterTopicInput.isNotBlank()) "Generate Custom Openers"
+                            else "Generate AI Openers",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${selectedStarterCategory.title} (${startersList.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "1-Tap Copy",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    startersList.forEach { starter ->
+                        val isCopied = copiedStarterId == starter.id
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isCopied) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                }
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = starter.tag.ifBlank { starter.category.title },
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+
+                                    FilledTonalButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("Wise Chat Opener", starter.text)
+                                            clipboard.setPrimaryClip(clip)
+                                            copiedStarterId = starter.id
+                                            onCopyStarter?.invoke(starter)
+                                            Toast.makeText(context, "Opener copied! Ready to send.", Toast.LENGTH_SHORT).show()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                            contentDescription = "Copy",
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(if (isCopied) "Copied" else "Copy", fontSize = 11.sp)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Text(
+                                    text = starter.text,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Normal
+                                )
+
+                                if (starter.whyItWorks.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "💡 ${starter.whyItWorks}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // --- REPLIES TAB CONTENT ---
+                // --- STATE DISPLAY ---
+                if (isAnalyzing) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -696,4 +932,5 @@ fun OverlayPanelContent(
             }
         }
     }
+}
 }
