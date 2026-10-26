@@ -11,9 +11,38 @@
 
 ---
 
+### 📥 Download Prebuilt APKs (Universal Android Compatibility)
+
+Ready-to-install APK packages compatible with all Android devices (phones, tablets, foldables, emulators; ARM64, ARMv7, x86, x86_64):
+
+- 🚀 **[Download Release APK (wise-chat-release.apk)](./apk/wise-chat-release.apk?raw=true)** — *15.6 MB, ProGuard-optimized, release build*
+- 🛠️ **[Download Debug APK (wise-chat-debug.apk)](./apk/wise-chat-debug.apk?raw=true)** — *23.0 MB, debug build*
+
+---
+
 ## 🚀 Key Features
 
-### 1. Floating Overlay Assistant (Flagship Mode)
+### 1. Conversation Starters & Unique Pick-Up Lines (NEW ✨)
+- **Strict Anti-Cliché Mandate:** Completely forbids tired clichés (*"Did it hurt when you fell from heaven?"*, *"Are you a magician?"*, *"Are you from Tennessee?"*, generic *"Hey/What's up"*).
+- **The "Aww" & Smile Mandate:** Crafted specifically to melt hearts, elicit a soft smile or blush, and feel disarmingly genuine and charming.
+- **Simple, Understandable English:** Natural, modern conversational phrasing without archaic or pretentious words.
+- **5 Tailored Categories & Curated Vault (30+ Lines):**
+  - **Sweet & 'Aww' (🥺):** Sincere warmth, adorable vulnerability, and genuine heart-melters.
+  - **Playful Tease (😏):** Witty push-pull challenges and playful tension.
+  - **Smooth Rizz (✨):** Effortless magnetic confidence and cool charisma.
+  - **Profile & Bio Hook (🎯):** Observant openers connecting to hobbies, pets, or travel photos.
+  - **Fun & Curious (🤔):** Engaging dilemmas and debates that break the ice instantly.
+- **Dual Mode Access:**
+  - Dedicated full-app screen with category selector, bio/topic input, and 1-tap copy.
+  - Floating overlay tab to generate or copy openers directly over Tinder, Bumble, Hinge, or WhatsApp without leaving the app.
+- **Multi-Provider AI & Curated Fallback:** Real-time generation powered by Gemini, OpenAI, Claude, or local LLMs, with instant offline access to the hand-crafted library.
+
+### 2. Holistic Conversation Understanding & Flirty Persona Upgrade
+- **Rhymes with the Whole Chat:** Never analyzes the latest message in isolation. Synthesizes full conversation history, running jokes, callbacks, and conversational rhythm.
+- **Anti-Shallow Reactions:** Seamlessly advances the topic when incoming messages are brief (*"haha"*, *"ok"*, memes, or stickers).
+- **High-Charm Flirty Replies:** Distinct multi-angle flirting styles (The Heart-Melter, The Playful Tease, The Smooth Charmer, and The Callback Flirt).
+
+### 3. Floating Overlay Assistant (Flagship Mode)
 - **Persistent Accessibility:** Operates directly above WhatsApp, Telegram, Instagram, Messenger, dating applications, and email clients using Android's `TYPE_APPLICATION_OVERLAY`.
 - **Draggable Bubble with Inertia:** Circular bubble with touch-drag physics, screen-border edge snapping, and live visual state rings (Idle, Analyzing pulse, Success checkmark, Error badge).
 - **In-App Compose Panel:** Expandable bottom sheet embedded directly in the overlay window to view extracted messages, pick reply personalities, and preview suggestions without app-switching.
@@ -171,8 +200,9 @@ The compiled APK will be located at:
 ## 🧪 Automated Testing
 
 Unit test suite covers:
+- **ConversationStartersTest:** Verifies strict anti-cliché filters, 'Aww' mandate, simple English directive, JSON parsing across markdown fences, and completeness of the 30+ curated library.
 - **ConversationParserTest:** Verifies spatial clustering, chronological sorting, incoming vs. outgoing horizontal detection, noise filtering.
-- **PromptBuilderTest:** Verifies prompt construction, untrusted conversation isolation delimiters, and 20 personality directives.
+- **PromptBuilderTest:** Verifies prompt construction, untrusted conversation isolation delimiters, holistic conversation rhyme, and 20 personality directives.
 - **ProviderParsingTest:** Verifies custom REST template variable interpolation and Keystore API key masking.
 
 Execute tests via:
