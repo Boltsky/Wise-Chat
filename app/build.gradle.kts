@@ -4,6 +4,16 @@ plugins {
     alias(libs.plugins.google.devtools.ksp)
 }
 
+fun getGitCommitHash(): String {
+    return try {
+        val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD").start()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        output.ifBlank { "4b95dd4" }
+    } catch (_: Exception) {
+        "4b95dd4"
+    }
+}
+
 android {
     namespace = "com.wisechat.app"
     compileSdk = 35
@@ -12,8 +22,11 @@ android {
         applicationId = "com.wisechat.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.2.0"
+
+        buildConfigField("String", "GIT_COMMIT_HASH", "\"${getGitCommitHash()}\"")
+        buildConfigField("Long", "BUILD_TIME", "${System.currentTimeMillis()}L")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

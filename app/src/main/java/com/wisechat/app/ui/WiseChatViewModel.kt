@@ -8,6 +8,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.wisechat.app.BuildConfig
 import com.wisechat.app.WiseChatApp
 import com.wisechat.app.data.local.entity.HistoryEntity
 import com.wisechat.app.data.preferences.ThemeMode
@@ -15,6 +16,7 @@ import com.wisechat.app.domain.model.*
 import com.wisechat.app.engine.ocr.MlKitOcrEngine
 import com.wisechat.app.engine.provider.GenerateRepliesParams
 import com.wisechat.app.engine.provider.RefineReplyParams
+import com.wisechat.app.engine.update.AppUpdateDownloader
 import com.wisechat.app.overlay.OverlayService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -37,7 +39,16 @@ data class WiseChatUiState(
     val selectedStarterCategory: StarterCategory = StarterCategory.SWEET_AWW,
     val startersList: List<ConversationStarter> = CuratedStartersLibrary.getByCategory(StarterCategory.SWEET_AWW),
     val isGeneratingStarters: Boolean = false,
-    val starterTopicInput: String = ""
+    val starterTopicInput: String = "",
+    val updateInfo: AppUpdateInfo? = null,
+    val isCheckingUpdate: Boolean = false,
+    val showUpdateDialog: Boolean = false,
+    val isUpdateBannerDismissed: Boolean = false,
+    val isDownloadingUpdate: Boolean = false,
+    val updateCheckMessage: String? = null,
+    val autoUpdateEnabled: Boolean = true,
+    val updateChannel: UpdateChannel = UpdateChannel.STABLE,
+    val lastUpdateCheckedTime: Long = 0L
 )
 
 class WiseChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -87,6 +98,8 @@ class WiseChatViewModel(application: Application) : AndroidViewModel(application
     init {
         checkOverlayStatus()
         observeActiveProvider()
+        observeUpdatePreferences()
+        checkAutoUpdateOnStartup()
     }
 
     fun completeOnboarding() {
@@ -394,6 +407,133 @@ class WiseChatViewModel(application: Application) : AndroidViewModel(application
                 style = starter.tag.ifBlank { starter.category.title },
                 providerName = provider
             )
+        }
+    }
+
+    private fun observeUpdatePreferences() {
+        viewModelScope.launch {
+            combine(
+                app.preferencesManager.autoUpdateCheckEnabled,
+                app.preferencesManager.updateChannel,
+                app.preferencesManager.lastUpdateCheckTimestamp
+            ) { autoCheck, channel, lastCheck ->
+                Triple(autoCheck, channel, lastCheck)
+            }.collect { (autoCheck, channel, lastCheck) ->
+                _uiState.update {
+                    it.copy(
+                        autoUpdateEnabled = autoCheck,
+                        updateChannel = channel,
+                        lastUpdateCheckedTime = lastCheck
+                    )
+                }
+            }
+        }
+    }
+
+    private fun checkAutoUpdateOnStartup() {
+        viewModelScope.launch {
+            val autoCheck = app.preferencesManager.autoUpdateCheckEnabled.first()
+            if (autoCheck) {
+                checkForUpdates(manual = false)
+            }
+        }
+    }
+
+    fun checkForUpdates(manual: Boolean = false) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCheckingUpdate = true, updateCheckMessage = null) }
+            val channel = _uiState.value.updateChannel
+            val result = app.updateRepository.checkForUpdate(channel = channel, force = manual)
+
+            result.onSuccess { checkResult ->
+                when (checkResult) {
+                    is UpdateCheckResult.UpdateAvailable -> {
+                        _uiState.update {
+                            it.copy(
+                                isCheckingUpdate = false,
+                                updateInfo = checkResult.updateInfo,
+                                showUpdateDialog = true,
+                                isUpdateBannerDismissed = false,
+                                updateCheckMessage = "New update available: v${checkResult.updateInfo.remoteVersionName}"
+                            )
+                        }
+                    }
+                    is UpdateCheckResult.UpToDate -> {
+                        _uiState.update {
+                            it.copy(
+                                isCheckingUpdate = false,
+                                updateInfo = checkResult.latestInfo,
+                                showUpdateDialog = false,
+                                updateCheckMessage = if (manual) "Wise Chat is up to date (v${BuildConfig.VERSION_NAME})" else null
+                            )
+                        }
+                    }
+                    is UpdateCheckResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isCheckingUpdate = false,
+                                updateCheckMessage = if (manual) "Update check failed: ${checkResult.message}" else null
+                            )
+                        }
+                    }
+                }
+            }.onFailure { ex ->
+                _uiState.update {
+                    it.copy(
+                        isCheckingUpdate = false,
+                        updateCheckMessage = if (manual) "Could not connect to GitHub: ${ex.localizedMessage ?: "Network error"}" else null
+                    )
+                }
+            }
+        }
+    }
+
+    fun showUpdateDialog() {
+        _uiState.update { it.copy(showUpdateDialog = true) }
+    }
+
+    fun dismissUpdateDialog() {
+        val info = _uiState.value.updateInfo
+        _uiState.update { it.copy(showUpdateDialog = false) }
+        if (info != null) {
+            viewModelScope.launch {
+                app.preferencesManager.setDismissedUpdateVersionCode(info.remoteVersionCode)
+            }
+        }
+    }
+
+    fun dismissUpdateBanner() {
+        _uiState.update { it.copy(isUpdateBannerDismissed = true) }
+    }
+
+    fun downloadAndInstallUpdate(context: android.content.Context) {
+        val info = _uiState.value.updateInfo ?: return
+        _uiState.update { it.copy(isDownloadingUpdate = true) }
+        AppUpdateDownloader.downloadAndInstall(
+            context = context,
+            downloadUrl = info.downloadUrl,
+            versionName = info.remoteVersionName,
+            onDownloadStarted = {
+                _uiState.update { it.copy(isDownloadingUpdate = false, showUpdateDialog = false) }
+            }
+        )
+    }
+
+    fun openUpdateInBrowser(context: android.content.Context) {
+        val info = _uiState.value.updateInfo ?: return
+        AppUpdateDownloader.openInBrowser(context, info.githubUrl.ifBlank { info.downloadUrl })
+        _uiState.update { it.copy(showUpdateDialog = false) }
+    }
+
+    fun setAutoUpdateEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesManager.setAutoUpdateCheckEnabled(enabled)
+        }
+    }
+
+    fun setUpdateChannel(channel: UpdateChannel) {
+        viewModelScope.launch {
+            app.preferencesManager.setUpdateChannel(channel)
         }
     }
 }

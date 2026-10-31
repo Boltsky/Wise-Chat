@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wisechat.app.domain.model.ReplyStyle
 import com.wisechat.app.ui.WiseChatUiState
+import com.wisechat.app.ui.screens.update.UpdateBanner
+import com.wisechat.app.ui.screens.update.UpdateDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +43,12 @@ fun HomeScreen(
     onNavigateToCustomStyles: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToStarters: () -> Unit = {}
+    onNavigateToStarters: () -> Unit = {},
+    onReviewUpdateClicked: () -> Unit = {},
+    onDismissUpdateBanner: () -> Unit = {},
+    onUpdateNow: () -> Unit = {},
+    onOpenUpdateInBrowser: () -> Unit = {},
+    onDismissUpdateDialog: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -105,6 +112,17 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
+
+            // In-App Update Reminder Banner (if update available and not dismissed)
+            if (uiState.updateInfo?.isUpdateAvailable == true && !uiState.isUpdateBannerDismissed) {
+                item {
+                    UpdateBanner(
+                        updateInfo = uiState.updateInfo,
+                        onReviewClicked = onReviewUpdateClicked,
+                        onDismissClicked = onDismissUpdateBanner
+                    )
+                }
+            }
 
             // Active Provider Pill
             item {
@@ -456,5 +474,16 @@ fun HomeScreen(
 
             item { Spacer(modifier = Modifier.height(24.dp)) }
         }
+    }
+
+    // Material 3 Update Prompt Dialog
+    if (uiState.showUpdateDialog && uiState.updateInfo != null) {
+        UpdateDialog(
+            updateInfo = uiState.updateInfo,
+            isDownloading = uiState.isDownloadingUpdate,
+            onUpdateNow = onUpdateNow,
+            onOpenInBrowser = onOpenUpdateInBrowser,
+            onDismiss = onDismissUpdateDialog
+        )
     }
 }

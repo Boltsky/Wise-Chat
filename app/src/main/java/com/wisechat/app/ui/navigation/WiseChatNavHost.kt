@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -67,6 +68,7 @@ fun WiseChatNavHost(
         }
 
         composable(Routes.HOME) {
+            val context = LocalContext.current
             HomeScreen(
                 uiState = uiState,
                 onToggleOverlay = { viewModel.setOverlayEnabled(it) },
@@ -78,7 +80,12 @@ fun WiseChatNavHost(
                 onNavigateToCustomStyles = { navController.navigate(Routes.CUSTOM_STYLES) },
                 onNavigateToHistory = { navController.navigate(Routes.HISTORY) },
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
-                onNavigateToStarters = { navController.navigate(Routes.STARTERS) }
+                onNavigateToStarters = { navController.navigate(Routes.STARTERS) },
+                onReviewUpdateClicked = { viewModel.showUpdateDialog() },
+                onDismissUpdateBanner = { viewModel.dismissUpdateBanner() },
+                onUpdateNow = { viewModel.downloadAndInstallUpdate(context) },
+                onOpenUpdateInBrowser = { viewModel.openUpdateInBrowser(context) },
+                onDismissUpdateDialog = { viewModel.dismissUpdateDialog() }
             )
         }
 
@@ -135,6 +142,7 @@ fun WiseChatNavHost(
         }
 
         composable(Routes.SETTINGS) {
+            val context = LocalContext.current
             val themeMode by viewModel.themeMode.collectAsState()
             SettingsScreen(
                 uiState = uiState,
@@ -144,6 +152,12 @@ fun WiseChatNavHost(
                 onDisconnectProvider = { viewModel.disconnectActiveProvider() },
                 onToggleOverlay = { viewModel.setOverlayEnabled(it) },
                 onClearHistory = { viewModel.clearAllHistory() },
+                onCheckForUpdates = { viewModel.checkForUpdates(manual = true) },
+                onSetAutoUpdate = { viewModel.setAutoUpdateEnabled(it) },
+                onSetUpdateChannel = { viewModel.setUpdateChannel(it) },
+                onUpdateNow = { viewModel.downloadAndInstallUpdate(context) },
+                onOpenUpdateInBrowser = { viewModel.openUpdateInBrowser(context) },
+                onDismissUpdateDialog = { viewModel.dismissUpdateDialog() },
                 onNavigateBack = { navController.popBackStack() }
             )
         }

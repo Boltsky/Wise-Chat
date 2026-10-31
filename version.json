@@ -1,0 +1,12 @@
+{
+  "versionCode": 2,
+  "versionName": "1.2.0",
+  "commitSha": "4b95dd4",
+  "releaseTitle": "v1.2.0 - Conversation Starters, Pick-Up Lines & Holistic Chat",
+  "releaseNotes": "• Added unique conversation starters and heart-melting pick-up lines\n• Added 5 curated categories with 30+ hand-crafted openers\n• Dual UI access: main app screen + floating overlay tab\n• Holistic conversation understanding and high-charm flirty replies\n• Universal Android device compatibility",
+  "downloadUrl": "https://github.com/Boltsky/Wise-Chat/raw/main/apk/wise-chat-release.apk",
+  "githubReleaseUrl": "https://github.com/Boltsky/Wise-Chat",
+  "forceUpdate": false,
+  "minSupportedVersionCode": 1,
+  "publishedAt": "2026-10-26T06:33:16Z"
+}

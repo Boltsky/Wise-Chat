@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.wisechat.app.domain.model.ReplyLength
 import com.wisechat.app.domain.model.ReplyStyle
 import com.wisechat.app.domain.model.ToneIntensity
+import com.wisechat.app.domain.model.UpdateChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -33,6 +34,10 @@ class PreferencesManager(private val context: Context) {
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val ACTIVE_PROVIDER_CONFIGS = stringPreferencesKey("active_provider_configs_json")
         val CUSTOM_STYLES_JSON = stringPreferencesKey("custom_styles_json")
+        val AUTO_UPDATE_CHECK_ENABLED = booleanPreferencesKey("auto_update_check_enabled")
+        val UPDATE_CHANNEL = stringPreferencesKey("update_channel")
+        val LAST_UPDATE_CHECK_TIMESTAMP = longPreferencesKey("last_update_check_timestamp")
+        val DISMISSED_UPDATE_VERSION_CODE = intPreferencesKey("dismissed_update_version_code")
     }
 
     val overlayEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -164,5 +169,42 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun saveCustomStylesJson(json: String) {
         context.dataStore.edit { it[PreferencesKeys.CUSTOM_STYLES_JSON] = json }
+    }
+
+    val autoUpdateCheckEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.AUTO_UPDATE_CHECK_ENABLED] ?: true
+    }
+
+    val updateChannel: Flow<UpdateChannel> = context.dataStore.data.map { preferences ->
+        val name = preferences[PreferencesKeys.UPDATE_CHANNEL] ?: UpdateChannel.STABLE.name
+        try {
+            UpdateChannel.valueOf(name)
+        } catch (_: Exception) {
+            UpdateChannel.STABLE
+        }
+    }
+
+    val lastUpdateCheckTimestamp: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.LAST_UPDATE_CHECK_TIMESTAMP] ?: 0L
+    }
+
+    val dismissedUpdateVersionCode: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.DISMISSED_UPDATE_VERSION_CODE] ?: 0
+    }
+
+    suspend fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.AUTO_UPDATE_CHECK_ENABLED] = enabled }
+    }
+
+    suspend fun setUpdateChannel(channel: UpdateChannel) {
+        context.dataStore.edit { it[PreferencesKeys.UPDATE_CHANNEL] = channel.name }
+    }
+
+    suspend fun setLastUpdateCheckTimestamp(timestamp: Long) {
+        context.dataStore.edit { it[PreferencesKeys.LAST_UPDATE_CHECK_TIMESTAMP] = timestamp }
+    }
+
+    suspend fun setDismissedUpdateVersionCode(versionCode: Int) {
+        context.dataStore.edit { it[PreferencesKeys.DISMISSED_UPDATE_VERSION_CODE] = versionCode }
     }
 }

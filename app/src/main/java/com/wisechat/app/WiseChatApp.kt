@@ -14,6 +14,7 @@ import com.wisechat.app.data.preferences.PreferencesManager
 import com.wisechat.app.data.repository.HistoryRepository
 import com.wisechat.app.data.repository.ProviderRepository
 import com.wisechat.app.data.repository.StyleRepository
+import com.wisechat.app.data.repository.UpdateRepository
 import com.wisechat.app.data.security.SecureCredentialStorage
 import com.wisechat.app.engine.provider.ProviderCoordinator
 
@@ -36,6 +37,7 @@ class WiseChatApp : Application(), LifecycleOwner, ViewModelStoreOwner, SavedSta
     val historyRepository by lazy { HistoryRepository(database.historyDao()) }
     val providerRepository by lazy { ProviderRepository(preferencesManager, secureStorage) }
     val styleRepository by lazy { StyleRepository(preferencesManager) }
+    val updateRepository by lazy { UpdateRepository(preferencesManager) }
 
     val providerCoordinator by lazy { ProviderCoordinator(providerRepository) }
 
