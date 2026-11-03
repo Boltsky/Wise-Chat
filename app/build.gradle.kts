@@ -15,11 +15,11 @@ fun getGitCommitHash(): String {
 }
 
 android {
-    namespace = "com.wisechat.app"
+    namespace = "com.rizzwise.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.wisechat.app"
+        applicationId = "com.rizzwise.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 2
