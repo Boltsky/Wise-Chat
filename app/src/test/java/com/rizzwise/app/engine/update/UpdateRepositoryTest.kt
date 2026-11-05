@@ -101,4 +101,60 @@ class UpdateRepositoryTest {
         assertEquals("Fast Track (All Commits)", UpdateChannel.ALL_COMMITS.title)
         assertTrue(UpdateChannel.ALL_COMMITS.description.contains("main"))
     }
+
+    @Test
+    fun `test parseVersionManifestJson supports here now platform manifest format`() {
+        val hereNowJson = """
+            {
+              "appId": "rizzwise",
+              "appName": "RizzWise",
+              "version": "1.3.0",
+              "versionCode": 3,
+              "releaseDate": "2026-11-05",
+              "mandatory": false,
+              "minSupportedVersion": "1.0.0",
+              "platforms": {
+                "android": {
+                  "fileName": "rizzwise-release.apk",
+                  "downloadUrl": "/releases/rizzwise/rizzwise-release.apk",
+                  "fileSize": "15.7 MB",
+                  "bytes": 15691646,
+                  "sha256": "c981b18946efc5f3cbc212dd5b5ce4fc40f2e266e7800cc59fa8afc172e1427b"
+                }
+              },
+              "changelog": [
+                "Dual update endpoints (here.now CDN + GitHub)",
+                "Refined pick-up lines and conversation starters",
+                "Ultra-fast edge update synchronization"
+              ],
+              "releaseNotesUrl": "/#rizzwise"
+            }
+        """.trimIndent()
+
+        val info = repository.parseVersionManifestJson(hereNowJson)
+
+        assertEquals(3, info.remoteVersionCode)
+        assertEquals("1.3.0", info.remoteVersionName)
+        assertEquals("RizzWise v1.3.0", info.releaseTitle)
+        assertTrue(info.releaseNotes.contains("• Dual update endpoints"))
+        assertTrue(info.releaseNotes.contains("• Refined pick-up lines"))
+        assertEquals("https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk", info.downloadUrl)
+        assertEquals("https://awake-zephyr-d9x5.here.now/#rizzwise", info.githubUrl)
+        assertFalse(info.forceUpdate)
+        assertEquals("2026-11-05", info.publishedAt)
+    }
+
+    @Test
+    fun `test absolute download URLs are preserved as is`() {
+        val json = """
+            {
+              "versionCode": 3,
+              "versionName": "1.3.0",
+              "downloadUrl": "https://custom.cdn.com/apk/release.apk"
+            }
+        """.trimIndent()
+
+        val info = repository.parseVersionManifestJson(json)
+        assertEquals("https://custom.cdn.com/apk/release.apk", info.downloadUrl)
+    }
 }

@@ -30,19 +30,25 @@ class UpdateRepository(
             val effectiveChannel = channel ?: preferencesManager?.updateChannel?.first() ?: UpdateChannel.STABLE
             val now = System.currentTimeMillis()
 
-            // 1. Try primary raw manifest (fast CDN, no rate limit)
-            val manifestResult = fetchRawVersionManifest()
+            // 1. Multi-tiered manifest fetch:
+            //    Tier A: Edge CDN endpoint on here.now (https://awake-zephyr-d9x5.here.now/api/updates/rizzwise/latest.json)
+            //    Tier B: Edge root version.json (https://awake-zephyr-d9x5.here.now/version.json)
+            //    Tier C: GitHub raw repository manifest (https://raw.githubusercontent.com/Boltsky/Wise-Chat/main/version.json)
+            val manifestResult = fetchManifestFromUrl(HERE_NOW_UPDATE_URL)
+                .recoverCatching { fetchManifestFromUrl(HERE_NOW_VERSION_JSON_URL).getOrThrow() }
+                .recoverCatching { fetchManifestFromUrl(RAW_VERSION_JSON_URL).getOrThrow() }
+
             val remoteInfo = if (manifestResult.isSuccess) {
                 manifestResult.getOrNull()
             } else {
-                // Fallback to GitHub Commits API
-                Log.w(TAG, "Raw version.json failed: ${manifestResult.exceptionOrNull()?.message}. Falling back to GitHub Commits API.")
+                // Tier D: Fallback to GitHub Commits API
+                Log.w(TAG, "Edge and GitHub raw manifests failed: ${manifestResult.exceptionOrNull()?.message}. Falling back to GitHub Commits API.")
                 fetchFromGitHubCommitsApi().getOrNull()
             }
 
             if (remoteInfo == null) {
                 val errorMsg = manifestResult.exceptionOrNull()?.localizedMessage
-                    ?: "Unable to connect to GitHub update service"
+                    ?: "Unable to connect to update services (Edge CDN & GitHub)"
                 return@withContext Result.failure(RuntimeException(errorMsg))
             }
 
@@ -83,19 +89,22 @@ class UpdateRepository(
         return clean1.startsWith(clean2) || clean2.startsWith(clean1)
     }
 
-    private fun fetchRawVersionManifest(): Result<AppUpdateInfo> {
+    private fun fetchManifestFromUrl(url: String): Result<AppUpdateInfo> {
         return try {
             val request = Request.Builder()
-                .url(RAW_VERSION_JSON_URL)
+                .url(url)
                 .header("User-Agent", USER_AGENT)
                 .header("Cache-Control", "no-cache")
                 .build()
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    return Result.failure(RuntimeException("HTTP ${response.code} from raw manifest"))
+                    return Result.failure(RuntimeException("HTTP ${response.code} from $url"))
                 }
-                val body = response.body?.string() ?: ""
+                val body = response.body?.string()?.trim() ?: ""
+                if (body.isEmpty() || body.startsWith("<") || body == "Not found") {
+                    return Result.failure(RuntimeException("Invalid non-JSON response from $url"))
+                }
                 val info = parseVersionManifestJson(body)
                 Result.success(info)
             }
@@ -128,14 +137,56 @@ class UpdateRepository(
     fun parseVersionManifestJson(jsonString: String): AppUpdateInfo {
         val json = JSONObject(jsonString)
         val versionCode = json.optInt("versionCode", 1)
-        val versionName = json.optString("versionName", "1.0.0")
+        val versionName = when {
+            json.has("versionName") -> json.optString("versionName", "1.0.0")
+            json.has("version") -> json.optString("version", "1.0.0")
+            else -> "1.0.0"
+        }
         val commitSha = json.optString("commitSha", "")
-        val releaseTitle = json.optString("releaseTitle", "RizzWise Update")
-        val releaseNotes = json.optString("releaseNotes", "New performance and feature updates.")
-        val downloadUrl = json.optString("downloadUrl", DEFAULT_DOWNLOAD_URL)
-        val githubUrl = json.optString("githubReleaseUrl", GITHUB_REPO_URL)
-        val forceUpdate = json.optBoolean("forceUpdate", false)
-        val publishedAt = json.optString("publishedAt", "")
+
+        val appName = json.optString("appName", "RizzWise")
+        val releaseTitle = json.optString("releaseTitle", "$appName v$versionName")
+
+        // Parse changelog / releaseNotes
+        val releaseNotes = if (json.has("releaseNotes")) {
+            json.optString("releaseNotes")
+        } else {
+            val changelogArr = json.optJSONArray("changelog")
+            if (changelogArr != null && changelogArr.length() > 0) {
+                (0 until changelogArr.length()).joinToString("\n") { idx ->
+                    "• " + changelogArr.optString(idx)
+                }
+            } else {
+                "New performance and feature updates."
+            }
+        }
+
+        // Parse download URL with relative path resolution
+        var downloadUrl = json.optString("downloadUrl", "")
+        if (downloadUrl.isBlank()) {
+            val platforms = json.optJSONObject("platforms")
+            val androidObj = platforms?.optJSONObject("android")
+            downloadUrl = androidObj?.optString("downloadUrl", "") ?: ""
+        }
+        if (downloadUrl.isBlank()) {
+            downloadUrl = DEFAULT_DOWNLOAD_URL
+        } else if (downloadUrl.startsWith("/")) {
+            downloadUrl = "$HERE_NOW_BASE_URL$downloadUrl"
+        }
+
+        // Parse GitHub / Release notes URL
+        var githubUrl = json.optString("githubReleaseUrl", "")
+        if (githubUrl.isBlank()) {
+            githubUrl = json.optString("releaseNotesUrl", "")
+        }
+        if (githubUrl.isBlank()) {
+            githubUrl = GITHUB_REPO_URL
+        } else if (githubUrl.startsWith("/")) {
+            githubUrl = "$HERE_NOW_BASE_URL$githubUrl"
+        }
+
+        val forceUpdate = json.optBoolean("forceUpdate", json.optBoolean("mandatory", false))
+        val publishedAt = json.optString("publishedAt", json.optString("releaseDate", ""))
 
         return AppUpdateInfo(
             remoteVersionCode = versionCode,
@@ -181,10 +232,15 @@ class UpdateRepository(
 
     companion object {
         private const val TAG = "UpdateRepository"
+        const val HERE_NOW_BASE_URL = "https://awake-zephyr-d9x5.here.now"
+        const val HERE_NOW_UPDATE_URL = "https://awake-zephyr-d9x5.here.now/api/updates/rizzwise/latest.json"
+        const val HERE_NOW_VERSION_JSON_URL = "https://awake-zephyr-d9x5.here.now/version.json"
+        const val HERE_NOW_DOWNLOAD_URL = "https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk"
         const val RAW_VERSION_JSON_URL = "https://raw.githubusercontent.com/Boltsky/Wise-Chat/main/version.json"
         const val GITHUB_COMMITS_API_URL = "https://api.github.com/repos/Boltsky/Wise-Chat/commits/main"
         const val GITHUB_REPO_URL = "https://github.com/Boltsky/Wise-Chat"
-        const val DEFAULT_DOWNLOAD_URL = "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk"
+        const val DEFAULT_DOWNLOAD_URL = HERE_NOW_DOWNLOAD_URL
+        const val GITHUB_DOWNLOAD_URL = "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk"
         private const val USER_AGENT = "RizzWise-Android-App"
     }
 }

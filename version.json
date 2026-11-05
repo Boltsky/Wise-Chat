@@ -1,12 +1,13 @@
 {
-  "versionCode": 2,
-  "versionName": "1.2.0",
-  "commitSha": "4b95dd4",
-  "releaseTitle": "v1.2.0 - Rebranded to RizzWise: Smart Charisma & Dating Assistant",
-  "releaseNotes": "• Rebranded to RizzWise\n• Added unique conversation starters and heart-melting pick-up lines\n• Added 5 curated categories with 30+ hand-crafted openers\n• Dual UI access: main app screen + floating overlay tab\n• Holistic conversation understanding and high-charm flirty replies\n• In-app version control & automatic GitHub update detection",
-  "downloadUrl": "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk",
+  "versionCode": 3,
+  "versionName": "1.3.0",
+  "commitSha": "ebec0d8",
+  "releaseTitle": "v1.3.0 - High-Speed Edge Update Sync & RizzWise Charisma Enhancements",
+  "releaseNotes": "• Dual update endpoints: High-speed edge CDN (awake-zephyr-d9x5.here.now) + GitHub Releases\n• Automatic failover between release servers\n• Enhanced update detection and background downloader\n• Pick-up lines & conversation starters library refinements\n• Stability and performance improvements",
+  "downloadUrl": "https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk",
+  "backupDownloadUrl": "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk",
   "githubReleaseUrl": "https://github.com/Boltsky/Wise-Chat",
   "forceUpdate": false,
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-26T06:33:16Z"
+  "publishedAt": "2026-11-05T14:30:00Z"
 }

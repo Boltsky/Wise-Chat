@@ -15,18 +15,19 @@
 
 Ready-to-install APK packages compatible with all Android devices (phones, tablets, foldables, emulators; ARM64, ARMv7, x86, x86_64):
 
-- 🚀 **[Download Release APK (rizzwise-release.apk)](./apk/rizzwise-release.apk?raw=true)** — *15.6 MB, ProGuard-optimized, release build*
+- ⚡ **[Download from High-Speed Edge CDN (rizzwise-release.apk)](https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk)** — *Fast global mirror hosted on Cloudflare edge*
+- 🚀 **[Download from GitHub Mirror (rizzwise-release.apk)](./apk/rizzwise-release.apk?raw=true)** — *15.6 MB, release build*
 - 🛠️ **[Download Debug APK (rizzwise-debug.apk)](./apk/rizzwise-debug.apk?raw=true)** — *23.0 MB, debug build*
 
 ---
 
 ## 🚀 Key Features
 
-### 1. In-App Version Control & Auto-Update Engine (NEW ✨)
-- **Automatic GitHub Update Detection:** Background check against GitHub repository release metadata (`version.json`) with configurable intervals (Daily, Every 3 Days, Weekly, or on App Launch).
-- **Manual "Check for Updates" Button:** Real-time update checks with live feedback, commit hash verification, and changelog presentation.
-- **In-App Background APK Downloader:** Integrated `DownloadManager` support that pulls official updates (`rizzwise-release.apk`) directly to the device.
-- **Safe Android Package Installer Integration:** Seamlessly triggers Android's package installer (`FileProvider`) upon completion with complete error handling.
+### 1. In-App Version Control & Multi-Endpoint Auto-Update Engine (NEW ✨)
+- **High-Speed Edge CDN Hosting:** Primary update manifest hosted on **[awake-zephyr-d9x5.here.now](https://awake-zephyr-d9x5.here.now/api/updates/rizzwise/latest.json)** with zero rate limits, fast download speeds, and resumable transfers.
+- **Multi-Tiered Failover:** Automatically syncs with `awake-zephyr-d9x5.here.now`, falls back to GitHub raw `version.json`, and as a last line of defense queries the GitHub Commits API.
+- **Background & On-Demand Checking:** Automatic checks on launch or user-configured schedules, plus a manual "Check for Updates" button in Settings.
+- **In-App Background APK Downloader:** Integrated Android `DownloadManager` pulls updates directly into downloads and launches the native package installer via secure `FileProvider`.
 
 ### 2. Conversation Starters & Unique Pick-Up Lines
 - **Strict Anti-Cliché Mandate:** Completely forbids tired clichés (*"Did it hurt when you fell from heaven?"*, *"Are you a magician?"*, *"Are you from Tennessee?"*, generic *"Hey/What's up"*).

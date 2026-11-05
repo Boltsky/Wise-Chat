@@ -484,10 +484,10 @@ fun SettingsScreen(
                 }
             }
 
-            // --- Version Control & GitHub Updates ---
+            // --- Version Control & In-App Updates ---
             item {
                 Text(
-                    text = "Version Control & GitHub Updates",
+                    text = "Version Control & In-App Updates",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -607,13 +607,20 @@ fun SettingsScreen(
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Checking GitHub Repo...", fontSize = 13.sp)
+                                Text("Checking Release Servers...", fontSize = 13.sp)
                             } else {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Check for Updates Now", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Edge CDN: awake-zephyr-d9x5.here.now • Backup: GitHub",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
 
                         Spacer(modifier = Modifier.height(14.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
