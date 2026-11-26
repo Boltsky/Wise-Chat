@@ -37,7 +37,7 @@ fun RepliesScreen(
     var refiningReplyText by remember { mutableStateOf<String?>(null) }
     var showRefineMenuFor by remember { mutableStateOf<String?>(null) }
 
-    val targetMessage = uiState.conversationContext?.resolvedTargetMessage?.text ?: "Incoming message"
+    val targetMessage = uiState.conversationContext?.resolvedTargetText?.ifBlank { "Incoming message" } ?: "Incoming message"
 
     Scaffold(
         topBar = {

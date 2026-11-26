@@ -96,7 +96,7 @@ class OpenAiProvider(
                 val prompt = PromptBuilder.buildRefinementPrompt(
                     originalReply = params.originalReply,
                     refinementType = params.refinementType,
-                    targetMessage = params.conversationContext.resolvedTargetMessage?.text ?: "",
+                    targetMessage = params.conversationContext.resolvedTargetText,
                     context = params.conversationContext
                 )
 

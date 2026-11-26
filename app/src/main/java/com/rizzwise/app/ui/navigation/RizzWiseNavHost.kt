@@ -93,6 +93,7 @@ fun RizzWiseNavHost(
             AnalysisScreen(
                 uiState = uiState,
                 onTargetMessageSelected = { id -> viewModel.setTargetMessage(id) },
+                onSelectTargetStreak = { viewModel.setTargetStreak() },
                 onMessageEdited = { id, text -> viewModel.updateMessageText(id, text) },
                 onContinueToStyles = { navController.navigate(Routes.STYLES) },
                 onNavigateBack = { navController.popBackStack() }

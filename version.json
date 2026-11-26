@@ -1,13 +1,13 @@
 {
-  "versionCode": 4,
-  "versionName": "1.4.0",
-  "commitSha": "ab5b797",
-  "releaseTitle": "v1.4.0 - Enhanced Received Message Detection & Accuracy Fix",
-  "releaseNotes": "• Fixed received message detection (no longer mistakes received messages for sent messages)\n• Improved multiline chat bubble clustering\n• Fixed delivery checkmark false positives\n• High-speed Edge CDN update streaming (awake-zephyr-d9x5.here.now) + GitHub Releases fallback\n• Overlay message picker shows all captured messages with Them/You badges\n• Performance and OCR accuracy optimizations",
+  "versionCode": 5,
+  "versionName": "1.5.0",
+  "commitSha": "50848a6",
+  "releaseTitle": "v1.5.0 - Received Streak Analysis & Avatar-Offset OCR Fix",
+  "releaseNotes": "• Fixed received message misdetection in avatar-offset apps (Instagram, Messenger, Tinder, Bumble, Hinge)\n• Fixed prose delivery keywords ('read', 'sent') falsely marking received messages as sent\n• Relaxed bottom crop margin so received messages near the input bar are always captured\n• Added automatic multi-message received streak grouping & cohesive AI streak replies\n• Added 1-tap 'Reply to Full Received Streak' option in overlay & analysis screen",
   "downloadUrl": "https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk",
   "backupDownloadUrl": "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk",
   "githubReleaseUrl": "https://github.com/Boltsky/Wise-Chat",
   "forceUpdate": false,
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-25T14:35:00Z"
+  "publishedAt": "2026-11-26T07:35:00Z"
 }

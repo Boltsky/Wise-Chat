@@ -169,4 +169,121 @@ class ConversationParserTest {
         assertEquals(1, context.messages.size)
         assertEquals("See you tomorrow!", context.messages[0].text)
     }
+
+    @Test
+    fun `test avatar-offset incoming message including wide line is classified as INCOMING`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        // Instagram/Messenger/Tinder style: left avatar pushes text start to ~18.5% (200f)
+        // and text wraps close to right edge (940f -> rightMargin ~13%)
+        val avatarOffsetIncoming = RawTextElement(
+            text = "Wait are you seriously telling me you didn't see that coming?",
+            boundingBox = MessageBoundingBox(left = 200f, top = 500f, right = 940f, bottom = 560f)
+        )
+
+        val context = ConversationParser.parseConversation(listOf(avatarOffsetIncoming), screenWidth, screenHeight)
+
+        assertEquals(1, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertTrue(context.messages[0].isTarget)
+    }
+
+    @Test
+    fun `test received message ending in prose read or sent without timestamp is INCOMING`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        val msgEndingWithSent = RawTextElement(
+            text = "Did you check the message I sent",
+            boundingBox = MessageBoundingBox(left = 190f, top = 400f, right = 880f, bottom = 460f)
+        )
+
+        val context = ConversationParser.parseConversation(listOf(msgEndingWithSent), screenWidth, screenHeight)
+
+        assertEquals(1, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals("Did you check the message I sent", context.messages[0].text)
+    }
+
+    @Test
+    fun `test received message near bottom input bar is captured`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        val olderSent = RawTextElement(
+            text = "Let me know! 10:15 AM ✓✓",
+            boundingBox = MessageBoundingBox(left = 480f, top = 1800f, right = 1030f, bottom = 1860f)
+        )
+        // Message sitting at ~90.5% to 92.5% of screen height (just above input bar)
+        val bottomReceived = RawTextElement(
+            text = "Just got home!",
+            boundingBox = MessageBoundingBox(left = 60f, top = 2170f, right = 420f, bottom = 2225f)
+        )
+
+        val context = ConversationParser.parseConversation(listOf(olderSent, bottomReceived), screenWidth, screenHeight)
+
+        assertEquals(2, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[1].sender)
+        assertEquals("Just got home!", context.resolvedTargetText)
+    }
+
+    @Test
+    fun `test wide incoming bubble and closely following outgoing bubble do not merge`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        val wideIncoming = RawTextElement(
+            text = "Okay sounds good, see you at the coffee shop around 6pm!",
+            boundingBox = MessageBoundingBox(left = 60f, top = 600f, right = 920f, bottom = 650f)
+        )
+        val shortOutgoing = RawTextElement(
+            text = "Bet! ✓✓",
+            boundingBox = MessageBoundingBox(left = 780f, top = 685f, right = 1030f, bottom = 735f)
+        )
+
+        val context = ConversationParser.parseConversation(listOf(wideIncoming, shortOutgoing), screenWidth, screenHeight)
+
+        assertEquals(2, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals(SenderRole.OUTGOING, context.messages[1].sender)
+        assertEquals(wideIncoming.text, context.resolvedTargetText)
+    }
+
+    @Test
+    fun `test contiguous received streak selects all streak messages as target`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        val myPreviousMsg = RawTextElement(
+            text = "Hey what's up? ✓✓",
+            boundingBox = MessageBoundingBox(left = 550f, top = 300f, right = 1030f, bottom = 350f)
+        )
+        val streak1 = RawTextElement(
+            text = "Heyyy",
+            boundingBox = MessageBoundingBox(left = 60f, top = 460f, right = 260f, bottom = 510f)
+        )
+        val streak2 = RawTextElement(
+            text = "Are you free tonight?",
+            boundingBox = MessageBoundingBox(left = 60f, top = 580f, right = 540f, bottom = 630f)
+        )
+        val streak3 = RawTextElement(
+            text = "??",
+            boundingBox = MessageBoundingBox(left = 60f, top = 700f, right = 160f, bottom = 750f)
+        )
+
+        val context = ConversationParser.parseConversation(
+            listOf(myPreviousMsg, streak1, streak2, streak3),
+            screenWidth,
+            screenHeight
+        )
+
+        assertEquals(4, context.messages.size)
+        assertFalse(context.messages[0].isTarget)
+        assertTrue(context.messages[1].isTarget)
+        assertTrue(context.messages[2].isTarget)
+        assertTrue(context.messages[3].isTarget)
+        assertEquals(3, context.resolvedTargetMessages.size)
+        assertEquals("Heyyy\nAre you free tonight?\n??", context.resolvedTargetText)
+    }
 }

@@ -27,6 +27,7 @@ import com.rizzwise.app.ui.RizzWiseUiState
 fun AnalysisScreen(
     uiState: RizzWiseUiState,
     onTargetMessageSelected: (String) -> Unit,
+    onSelectTargetStreak: () -> Unit = {},
     onMessageEdited: (String, String) -> Unit,
     onContinueToStyles: () -> Unit,
     onNavigateBack: () -> Unit
@@ -145,17 +146,28 @@ fun AnalysisScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Tap the message you want to reply to. The highlighted message is your active target.",
+                                text = "Tap any message to reply to it, or select the full received streak.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
                             )
+                            val streakSize = context?.latestIncomingStreak?.size ?: 0
+                            if (streakSize > 1) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                TextButton(
+                                    onClick = onSelectTargetStreak,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("Streak ($streakSize)", fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 items(messages) { message ->
-                    val isTarget = message.id == context?.resolvedTargetMessage?.id
+                    val isTarget = message.isTarget || message.id == context?.resolvedTargetMessage?.id
                     val isOutgoing = message.sender == SenderRole.OUTGOING
 
                     Row(

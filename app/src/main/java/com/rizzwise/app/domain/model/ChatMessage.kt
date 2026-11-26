@@ -42,10 +42,40 @@ data class ConversationContext(
             ?: messages.lastOrNull { it.sender != SenderRole.OUTGOING }
             ?: messages.lastOrNull()
 
+    val resolvedTargetMessages: List<ChatMessage>
+        get() {
+            val explicitlyTargeted = messages.filter { it.isTarget }
+            if (explicitlyTargeted.isNotEmpty()) return explicitlyTargeted
+            return listOfNotNull(resolvedTargetMessage)
+        }
+
+    val resolvedTargetText: String
+        get() = resolvedTargetMessages
+            .joinToString("\n") { it.text }
+            .ifBlank { resolvedTargetMessage?.text.orEmpty() }
+
+    val latestIncomingStreak: List<ChatMessage>
+        get() {
+            val lastIncomingIdx = messages.indexOfLast { it.sender == SenderRole.INCOMING }
+            if (lastIncomingIdx == -1) return emptyList()
+            var startIdx = lastIncomingIdx
+            while (startIdx > 0 && messages[startIdx - 1].sender == SenderRole.INCOMING) {
+                startIdx--
+            }
+            return messages.subList(startIdx, lastIncomingIdx + 1)
+        }
+
     fun withTarget(messageId: String): ConversationContext {
         val updated = messages.map { it.copy(isTarget = it.id == messageId) }
         val target = updated.firstOrNull { it.id == messageId }
         return copy(messages = updated, targetMessage = target)
+    }
+
+    fun withTargetStreak(): ConversationContext {
+        val streakIds = latestIncomingStreak.map { it.id }.toSet()
+        if (streakIds.isEmpty()) return this
+        val updated = messages.map { it.copy(isTarget = it.id in streakIds) }
+        return copy(messages = updated, targetMessage = updated.lastOrNull { it.isTarget })
     }
 
     fun updateMessageText(messageId: String, newText: String): ConversationContext {

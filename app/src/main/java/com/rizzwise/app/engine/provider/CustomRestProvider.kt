@@ -23,7 +23,7 @@ class CustomRestProvider(
     override suspend fun generateReplies(params: GenerateRepliesParams): Result<ReplyGenerationResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val target = params.conversationContext.resolvedTargetMessage?.text ?: ""
+                val target = params.conversationContext.resolvedTargetText
                 val convText = params.conversationContext.messages.joinToString("\n") {
                     val speaker = when (it.sender) {
                         SenderRole.INCOMING -> "Them"
@@ -80,7 +80,7 @@ class CustomRestProvider(
     override suspend fun refineReply(params: RefineReplyParams): Result<ReplyGenerationResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val target = params.conversationContext.resolvedTargetMessage?.text ?: ""
+                val target = params.conversationContext.resolvedTargetText
                 val requestBody = JSONObject().apply {
                     put("model", config.model)
                     put("instruction", params.refinementType.instruction)

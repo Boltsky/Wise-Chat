@@ -94,7 +94,9 @@ You must respond with valid JSON matching this exact structure:
     }
 
     fun buildUserMessage(context: ConversationContext): String {
-        val target = context.resolvedTargetMessage?.text ?: "Hello"
+        val targetMessages = context.resolvedTargetMessages
+        val target = context.resolvedTargetText.ifBlank { "Hello" }
+        val isStreak = targetMessages.size > 1
         val conversationHistory = if (context.messages.isNotEmpty()) {
             context.messages.joinToString("\n") { msg ->
                 val speaker = when (msg.sender) {
@@ -102,21 +104,35 @@ You must respond with valid JSON matching this exact structure:
                     SenderRole.OUTGOING -> "You"
                     SenderRole.UNKNOWN -> "Participant"
                 }
-                val marker = if (msg.isTarget) " [LATEST MESSAGE TO ANSWER]" else ""
+                val marker = when {
+                    msg.isTarget && isStreak -> " [LATEST RECEIVED STREAK - ANSWER ALL]"
+                    msg.isTarget -> " [LATEST MESSAGE TO ANSWER]"
+                    else -> ""
+                }
                 "$speaker: ${msg.text}$marker"
             }
         } else {
             "Them: $target [LATEST MESSAGE TO ANSWER]"
         }
 
+        val streakGuidance = if (isStreak) {
+            "\nNOTE: 'Them' sent a streak of ${targetMessages.size} consecutive messages. Make sure your reply naturally acknowledges and responds to the combined streak as a whole, not just the last fragment."
+        } else ""
+
+        val targetHeader = if (isStreak) {
+            "LATEST RECEIVED STREAK TO ANSWER IN CONTEXT:"
+        } else {
+            "LATEST MESSAGE TO ANSWER IN CONTEXT:"
+        }
+
         return """
-Please analyze this entire chat context holistically and generate diverse reply suggestions for 'You' to send to 'Them'. The replies must harmonize and rhyme with the full conversation history while thoughtfully answering the latest message.
+Please analyze this entire chat context holistically and generate diverse reply suggestions for 'You' to send to 'Them'. The replies must harmonize and rhyme with the full conversation history while thoughtfully answering the latest received message(s).$streakGuidance
 
 <<<FULL_CONVERSATION_HISTORY>>>
 $conversationHistory
 <<<END_FULL_CONVERSATION_HISTORY>>>
 
-LATEST MESSAGE TO ANSWER IN CONTEXT:
+$targetHeader
 "$target"
 """.trimIndent()
     }

@@ -30,7 +30,7 @@ object ConversationParser {
         RegexOption.IGNORE_CASE
     )
     private val END_OF_MESSAGE_DELIVERY_REGEX = Regex(
-        "(?:\\s+(?:[0-1]?[0-9]|2[0-3]):[0-5][0-9](?:\\s*(?:AM|PM|am|pm))?)?\\s*(?:[✓✔√]{1,2}|\\b(?:Delivered|Read|Sent|Edited)\\b)\\s*$",
+        "(?:\\s+(?:[0-1]?[0-9]|2[0-3]):[0-5][0-9](?:\\s*(?:AM|PM|am|pm))?\\s*(?:[✓✔√]{1,2}|\\b(?:Delivered|Read|Sent|Edited)\\b)|\\s*[✓✔√]{1,2})\\s*$",
         RegexOption.IGNORE_CASE
     )
     private val TRAILING_CHECKMARK_ONLY_REGEX = Regex(
@@ -86,9 +86,9 @@ object ConversationParser {
             return ConversationContext()
         }
 
-        // Crop margins: ignore top contact bar (~8%) and bottom input bar (~10%)
+        // Crop margins: ignore top contact bar (~8%) and bottom input bar (~7%)
         val topCropMargin = imageHeight * 0.08f
-        val bottomCropMargin = imageHeight * 0.90f
+        val bottomCropMargin = imageHeight * 0.93f
 
         // Filter out status bar, input bar elements, timestamps, and centered administrative notices
         val contentElements = elements.filter { element ->
@@ -133,17 +133,27 @@ object ConversationParser {
             }
         }
 
-        // Identify candidate target message:
-        // Priority 1: Latest incoming message (from "Them" - the person we want to reply to)
+        // Identify candidate target streak:
+        // Priority 1: Latest contiguous incoming message streak (from "Them")
         // Priority 2: Latest non-outgoing message (e.g. UNKNOWN sender)
         // Priority 3: Very last message if only outgoing messages exist
-        val candidateTarget = clusteredMessages.lastOrNull { it.sender == SenderRole.INCOMING }
-            ?: clusteredMessages.lastOrNull { it.sender != SenderRole.OUTGOING }
-            ?: clusteredMessages.lastOrNull()
+        val lastIncomingIdx = clusteredMessages.indexOfLast { it.sender == SenderRole.INCOMING }
+        val targetIds: Set<String> = if (lastIncomingIdx != -1) {
+            var startIdx = lastIncomingIdx
+            while (startIdx > 0 && clusteredMessages[startIdx - 1].sender == SenderRole.INCOMING) {
+                startIdx--
+            }
+            clusteredMessages.subList(startIdx, lastIncomingIdx + 1).map { it.id }.toSet()
+        } else {
+            val fallback = clusteredMessages.lastOrNull { it.sender != SenderRole.OUTGOING }
+                ?: clusteredMessages.lastOrNull()
+            setOfNotNull(fallback?.id)
+        }
 
         val markedMessages = clusteredMessages.map {
-            if (it.id == candidateTarget?.id) it.copy(isTarget = true) else it.copy(isTarget = false)
+            it.copy(isTarget = it.id in targetIds)
         }
+        val candidateTarget = markedMessages.lastOrNull { it.isTarget }
 
         return ConversationContext(
             messages = markedMessages,
@@ -159,42 +169,45 @@ object ConversationParser {
         val boxA = prev.boundingBox
         val boxB = curr.boundingBox
 
-        // Vertical gap check: prevent merging elements that are too far apart vertically
+        // Vertical gap check: prevent merging elements that belong to separate bubbles
         val verticalGap = boxB.top - boxA.bottom
-        val maxMergeGap = (boxA.height * 1.6f).coerceAtLeast(35f)
+        val maxMergeGap = (boxA.height * 0.95f).coerceAtLeast(24f)
         if (verticalGap > maxMergeGap) {
             return false
         }
 
-        // Both lines are left-anchored (Incoming bubble lines)
-        val bothLeftAnchored = boxA.left < imageWidth * 0.22f && boxB.left < imageWidth * 0.22f
+        // Both lines are left-anchored (Incoming bubble lines, including avatar-offset apps)
+        val bothLeftAnchored = boxA.left < imageWidth * 0.24f && boxB.left < imageWidth * 0.24f
         if (bothLeftAnchored) {
             val leftDiff = abs(boxA.left - boxB.left)
             if (leftDiff < imageWidth * 0.12f) return true
         }
 
         // Both lines are right-anchored (Outgoing bubble lines)
-        val bothRightAnchored = (imageWidth - boxA.right) < imageWidth * 0.22f &&
-                (imageWidth - boxB.right) < imageWidth * 0.22f
+        val bothRightAnchored = (imageWidth - boxA.right) < imageWidth * 0.20f &&
+                (imageWidth - boxB.right) < imageWidth * 0.20f &&
+                boxA.left > imageWidth * 0.22f && boxB.left > imageWidth * 0.22f
         if (bothRightAnchored) {
             val rightDiff = abs(boxA.right - boxB.right)
             if (rightDiff < imageWidth * 0.12f) return true
         }
 
         // Shared left margin for multiline incoming message where one line is wide
-        if (boxA.left < imageWidth * 0.15f && boxB.left < imageWidth * 0.15f) {
+        if (boxA.left < imageWidth * 0.22f && boxB.left < imageWidth * 0.22f &&
+            abs(boxA.left - boxB.left) < imageWidth * 0.08f
+        ) {
             return true
         }
 
         // Shared right margin for multiline outgoing message where one line is wide
-        if ((imageWidth - boxA.right) < imageWidth * 0.15f && (imageWidth - boxB.right) < imageWidth * 0.15f) {
+        if ((imageWidth - boxA.right) < imageWidth * 0.16f &&
+            (imageWidth - boxB.right) < imageWidth * 0.16f &&
+            boxA.left > imageWidth * 0.20f && boxB.left > imageWidth * 0.20f
+        ) {
             return true
         }
 
-        // Fallback: Both centers are on the same half of the screen
-        val sideA = boxA.centerX > imageWidth * 0.5f
-        val sideB = boxB.centerX > imageWidth * 0.5f
-        return sideA == sideB
+        return false
     }
 
     private fun buildMessageFromCluster(
@@ -250,22 +263,22 @@ object ConversationParser {
 
         // Priority 1: Delivery checkmarks strictly on the right half of the screen confirm OUTGOING.
         // A checkmark on the left half (e.g. an emoji in a received message) does NOT make it outgoing.
-        if (hasDeliveryStatus && rightMargin < 0.25f && leftMargin > 0.15f) {
+        if (hasDeliveryStatus && rightMargin < 0.25f && leftMargin > 0.20f) {
             return SenderRole.OUTGOING
         }
 
         // Priority 2: Clear Left Anchorage (INCOMING / RECEIVED)
-        // In all messaging apps, incoming messages start on the left (typically 3% to 15% margin).
+        // In messaging apps, incoming messages start on the left (3%–15% margin, or 15%–24% with left avatar).
         // Even wide multiline incoming messages start on the left.
-        if (leftMargin < 0.16f) {
-            if (leftMargin <= rightMargin || rightMargin > 0.10f) {
+        if (leftMargin < 0.24f) {
+            if (leftMargin <= rightMargin * 1.15f || rightMargin > 0.12f) {
                 return SenderRole.INCOMING
             }
         }
 
         // Priority 3: Clear Right Anchorage (OUTGOING / SENT)
-        // Outgoing messages end near the right edge (< 16% margin) and start away from the left edge (> 16%)
-        if (rightMargin < 0.16f && leftMargin > 0.16f) {
+        // Outgoing messages end near the right edge (< 16% margin) and start away from the left edge (> 24%)
+        if (rightMargin < 0.16f && leftMargin > 0.24f) {
             return SenderRole.OUTGOING
         }
 

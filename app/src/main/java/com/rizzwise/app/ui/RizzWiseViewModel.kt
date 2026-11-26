@@ -205,6 +205,13 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setTargetStreak() {
+        _uiState.update { state ->
+            val updatedContext = state.conversationContext?.withTargetStreak()
+            state.copy(conversationContext = updatedContext)
+        }
+    }
+
     fun updateMessageText(messageId: String, newText: String) {
         _uiState.update { state ->
             val updatedContext = state.conversationContext?.updateMessageText(messageId, newText)
@@ -288,7 +295,7 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
 
     fun onReplyCopied(suggestion: ReplySuggestion) {
         viewModelScope.launch {
-            val target = _uiState.value.conversationContext?.resolvedTargetMessage?.text ?: "Unknown"
+            val target = _uiState.value.conversationContext?.resolvedTargetText?.ifBlank { "Unknown" } ?: "Unknown"
             val provider = _uiState.value.activeProvider?.name ?: "Default"
             app.historyRepository.saveHistory(
                 targetMessage = target,

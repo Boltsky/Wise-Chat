@@ -64,6 +64,7 @@ fun OverlayPanelContent(
     onRescanClicked: () -> Unit,
     onStyleSelected: (ReplyStyle) -> Unit,
     onSelectTargetMessage: (String) -> Unit,
+    onSelectTargetStreak: () -> Unit = {},
     onTargetMessageChanged: (String) -> Unit,
     onGenerateClicked: () -> Unit,
     onRegenerateClicked: () -> Unit,
@@ -521,6 +522,9 @@ fun OverlayPanelContent(
             } else {
                 // --- CONVERSATION RECOGNIZED ---
                 val targetMsg = conversationContext.resolvedTargetMessage
+                val targetMessages = conversationContext.resolvedTargetMessages
+                val targetText = conversationContext.resolvedTargetText
+                val incomingStreak = conversationContext.latestIncomingStreak
                 val messagesList = conversationContext.messages
                 val displayMessages = messagesList
 
@@ -539,9 +543,11 @@ fun OverlayPanelContent(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                val roleLabel = when (targetMsg?.sender) {
-                                    SenderRole.INCOMING -> "Them (Received)"
-                                    SenderRole.OUTGOING -> "You (Sent)"
+                                val roleLabel = when {
+                                    targetMessages.size > 1 && targetMsg?.sender == SenderRole.INCOMING ->
+                                        "Them (Received • ${targetMessages.size} msgs)"
+                                    targetMsg?.sender == SenderRole.INCOMING -> "Them (Received)"
+                                    targetMsg?.sender == SenderRole.OUTGOING -> "You (Sent)"
                                     else -> "Message"
                                 }
                                 val badgeColor = when (targetMsg?.sender) {
@@ -641,17 +647,17 @@ fun OverlayPanelContent(
                             }
                         } else {
                             Text(
-                                text = targetMsg?.text ?: "No message selected",
+                                text = targetText.ifBlank { "No message selected" },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
-                                maxLines = 3,
+                                maxLines = if (targetMessages.size > 1) 4 else 3,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
 
-                // --- EXPANDABLE MESSAGE PICKER (RECEIVED ONLY) ---
+                // --- EXPANDABLE MESSAGE PICKER ---
                 AnimatedVisibility(
                     visible = isMessagePickerExpanded,
                     enter = expandVertically() + fadeIn(),
@@ -663,18 +669,64 @@ fun OverlayPanelContent(
                             .padding(vertical = 8.dp)
                     ) {
                         Text(
-                            text = "Select a message to reply to (received messages recommended):",
+                            text = "Select a message or full received streak to reply to:",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(6.dp))
+
+                        if (incomingStreak.size > 1) {
+                            val isFullStreakSelected = targetMessages.size == incomingStreak.size &&
+                                targetMessages.map { it.id }.toSet() == incomingStreak.map { it.id }.toSet()
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 6.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        onSelectTargetStreak()
+                                        isMessagePickerExpanded = false
+                                    }
+                                    .border(
+                                        width = if (isFullStreakSelected) 1.5.dp else 0.75.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(10.dp)
+                                    ),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(
+                                    alpha = if (isFullStreakSelected) 0.5f else 0.25f
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Reply to Full Received Streak (${incomingStreak.size} messages)",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (isFullStreakSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Streak selected",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         Column(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             displayMessages.forEach { msg ->
-                                val isSelected = msg.id == targetMsg?.id
+                                val isSelected = msg.isTarget || msg.id == targetMsg?.id
 
                                 Surface(
                                     modifier = Modifier

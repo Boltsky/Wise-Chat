@@ -76,6 +76,19 @@ class PromptBuilderTest {
     }
 
     @Test
+    fun `test user message handles multi-message received streak cohesively`() {
+        val m1 = ChatMessage(text = "Heyyy", sender = SenderRole.INCOMING, isTarget = true)
+        val m2 = ChatMessage(text = "Are you free tonight?", sender = SenderRole.INCOMING, isTarget = true)
+        val context = ConversationContext(messages = listOf(m1, m2), targetMessage = m2)
+
+        val userMessage = PromptBuilder.buildUserMessage(context)
+
+        assertTrue(userMessage.contains("Them: Heyyy [LATEST RECEIVED STREAK - ANSWER ALL]"))
+        assertTrue(userMessage.contains("Them: Are you free tonight? [LATEST RECEIVED STREAK - ANSWER ALL]"))
+        assertTrue(userMessage.contains("LATEST RECEIVED STREAK TO ANSWER IN CONTEXT:\n\"Heyyy\nAre you free tonight?\""))
+    }
+
+    @Test
     fun `test refinement prompt incorporates conversation context for holistic coherence`() {
         val messages = listOf(
             ChatMessage(text = "Had a crazy day at work today", sender = SenderRole.INCOMING),

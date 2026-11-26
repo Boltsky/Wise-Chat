@@ -319,6 +319,10 @@ class OverlayService : Service() {
                         currentContext = currentContext?.withTarget(messageId)
                         generateReplies()
                     },
+                    onSelectTargetStreak = {
+                        currentContext = currentContext?.withTargetStreak()
+                        generateReplies()
+                    },
                     onTargetMessageChanged = { text ->
                         val targetId = currentContext?.resolvedTargetMessage?.id
                         if (targetId != null) {
@@ -348,7 +352,7 @@ class OverlayService : Service() {
                     onCopySuggestion = { suggestion ->
                         serviceScope.launch {
                             try {
-                                val target = currentContext?.resolvedTargetMessage?.text ?: "Screen Capture"
+                                val target = currentContext?.resolvedTargetText?.ifBlank { "Screen Capture" } ?: "Screen Capture"
                                 val provider = app.providerRepository.getActiveProvider().name
                                 app.historyRepository.saveHistory(
                                     targetMessage = target,
