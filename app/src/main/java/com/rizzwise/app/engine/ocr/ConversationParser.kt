@@ -1,10 +1,13 @@
 package com.rizzwise.app.engine.ocr
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import com.rizzwise.app.domain.model.ChatMessage
 import com.rizzwise.app.domain.model.ConversationContext
 import com.rizzwise.app.domain.model.MessageBoundingBox
 import com.rizzwise.app.domain.model.SenderRole
 import java.util.regex.Pattern
+import kotlin.math.abs
 
 data class RawTextElement(
     val text: String,
@@ -19,28 +22,42 @@ object ConversationParser {
         "^\\s*([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(AM|PM|am|pm))?\\s*$"
     )
     private val TIME_WITH_STATUS_PATTERN = Pattern.compile(
-        "^\\s*([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(AM|PM|am|pm))?(\\s*(✓|✓✓|Delivered|Read|Sent|Edited))?\\s*$",
+        "^\\s*([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(AM|PM|am|pm))?(\\s*(✓|✓✓|√√|✔|✔✔|Delivered|Read|Sent|Edited))?\\s*$",
         Pattern.CASE_INSENSITIVE
     )
     private val TRAILING_TIME_CHECKMARK_REGEX = Regex(
-        "\\s+([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(AM|PM|am|pm))?(\\s*(✓|✓✓|Delivered|Read|Sent|Edited))?\\s*$",
+        "\\s+([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(AM|PM|am|pm))?(\\s*(✓|✓✓|√√|✔|✔✔|Delivered|Read|Sent|Edited))?\\s*$",
         RegexOption.IGNORE_CASE
+    )
+    private val END_OF_MESSAGE_DELIVERY_REGEX = Regex(
+        "(?:\\s+(?:[0-1]?[0-9]|2[0-3]):[0-5][0-9](?:\\s*(?:AM|PM|am|pm))?)?\\s*(?:[✓✔√]{1,2}|\\b(?:Delivered|Read|Sent|Edited)\\b)\\s*$",
+        RegexOption.IGNORE_CASE
+    )
+    private val TRAILING_CHECKMARK_ONLY_REGEX = Regex(
+        "\\s*[✓✔√]{1,2}\\s*$"
     )
 
     private val NOISE_WORDS = setOf(
         "today", "yesterday", "online", "typing...", "last seen",
-        "messages and calls are end-to-end encrypted", "tap here for info",
         "type a message", "message...", "send", "chat", "voice call", "video call",
         "search", "status", "calls", "chats", "camera", "settings"
     )
 
-    // UI phrases from Wise Chat itself to prevent self-analyzing its own screen
+    // Keywords that denote centered security cards or administrative system notices
+    private val SYSTEM_BANNER_KEYWORDS = listOf(
+        "end-to-end encrypted", "security code changed", "disappearing messages",
+        "messages to this chat and calls are now secured", "waiting for this message",
+        "added to group", "created group", "changed the subject", "changed the group",
+        "tap here for info", "tap for info"
+    )
+
+    // UI phrases from RizzWise / Wise Chat to prevent self-analyzing its own floating overlay
     private val APP_INTERNAL_UI_NOISE = listOf(
-        "wise chat", "ai reply assistant", "ai engine", "floating assistant",
-        "bubble active on screen", "import & analyze screenshot", "select screenshot",
-        "reply personalities", "custom voices", "reply history", "ai accounts",
-        "byok", "one-tap account connection", "not connected", "google gemini",
-        "anthropic claude", "service account"
+        "rizzwise", "wise chat", "floating rizz assistant", "ai reply assistant", "ai engine",
+        "floating assistant", "bubble active on screen", "import & analyze screenshot", "select screenshot",
+        "reply personalities", "custom voices", "reply history", "ai accounts", "byok",
+        "one-tap account connection", "not connected", "google gemini", "anthropic claude", "service account",
+        "open full rizzwise app"
     )
 
     enum class BubbleTint {
@@ -52,6 +69,8 @@ object ConversationParser {
 
     /**
      * Parses raw extracted OCR elements and clusters them into coherent chat messages.
+     * Accurately distinguishes between received (incoming/left) and sent (outgoing/right) messages.
+     *
      * @param elements Extracted OCR text elements with spatial bounding boxes.
      * @param imageWidth Width of the captured screenshot in pixels.
      * @param imageHeight Height of the captured screenshot in pixels.
@@ -61,7 +80,7 @@ object ConversationParser {
         elements: List<RawTextElement>,
         imageWidth: Int,
         imageHeight: Int,
-        bitmap: android.graphics.Bitmap? = null
+        bitmap: Bitmap? = null
     ): ConversationContext {
         if (elements.isEmpty()) {
             return ConversationContext()
@@ -71,18 +90,22 @@ object ConversationParser {
         val topCropMargin = imageHeight * 0.08f
         val bottomCropMargin = imageHeight * 0.90f
 
-        // Filter out status bar/input bar elements, pure noise, full-width cards, and Wise Chat UI
+        // Filter out status bar, input bar elements, timestamps, and centered administrative notices
         val contentElements = elements.filter { element ->
             val box = element.boundingBox
             val isWithinVerticalBounds = box.top >= topCropMargin && box.bottom <= bottomCropMargin
-            val isFullWidthBanner = box.width > (imageWidth * 0.78f) && (box.left < imageWidth * 0.12f)
-            isWithinVerticalBounds && !isFullWidthBanner && !isSystemNoise(element.text)
+            val isNoise = isSystemNoise(element.text) || isSystemBanner(element.text, box, imageWidth)
+            isWithinVerticalBounds && !isNoise
         }
 
-        // Sort elements from top to bottom
+        if (contentElements.isEmpty()) {
+            return ConversationContext()
+        }
+
+        // Sort elements chronologically from top to bottom
         val sortedElements = contentElements.sortedBy { it.boundingBox.top }
 
-        // Group elements vertically into bubbles
+        // Group elements vertically into message bubbles
         val clusteredMessages = mutableListOf<ChatMessage>()
         var currentCluster = mutableListOf<RawTextElement>()
 
@@ -91,12 +114,7 @@ object ConversationParser {
                 currentCluster.add(elem)
             } else {
                 val prev = currentCluster.last()
-                val verticalGap = elem.boundingBox.top - prev.boundingBox.bottom
-                val sameHorizontalSide = isSameSide(prev.boundingBox, elem.boundingBox, imageWidth)
-
-                // If gap is small and on same side, merge into the same chat bubble
-                val maxMergeGap = (prev.boundingBox.height * 1.5f).coerceAtLeast(35f)
-                if (verticalGap < maxMergeGap && sameHorizontalSide) {
+                if (isSameBubble(prev, elem, imageWidth)) {
                     currentCluster.add(elem)
                 } else {
                     val msg = buildMessageFromCluster(currentCluster, imageWidth, bitmap)
@@ -116,13 +134,15 @@ object ConversationParser {
         }
 
         // Identify candidate target message:
-        // Priority 1: Latest incoming message (from "Them")
-        // Priority 2: Very last message if no incoming message was detected
+        // Priority 1: Latest incoming message (from "Them" - the person we want to reply to)
+        // Priority 2: Latest non-outgoing message (e.g. UNKNOWN sender)
+        // Priority 3: Very last message if only outgoing messages exist
         val candidateTarget = clusteredMessages.lastOrNull { it.sender == SenderRole.INCOMING }
+            ?: clusteredMessages.lastOrNull { it.sender != SenderRole.OUTGOING }
             ?: clusteredMessages.lastOrNull()
 
         val markedMessages = clusteredMessages.map {
-            if (it.id == candidateTarget?.id) it.copy(isTarget = true) else it
+            if (it.id == candidateTarget?.id) it.copy(isTarget = true) else it.copy(isTarget = false)
         }
 
         return ConversationContext(
@@ -131,17 +151,61 @@ object ConversationParser {
         )
     }
 
+    private fun isSameBubble(
+        prev: RawTextElement,
+        curr: RawTextElement,
+        imageWidth: Int
+    ): Boolean {
+        val boxA = prev.boundingBox
+        val boxB = curr.boundingBox
+
+        // Vertical gap check: prevent merging elements that are too far apart vertically
+        val verticalGap = boxB.top - boxA.bottom
+        val maxMergeGap = (boxA.height * 1.6f).coerceAtLeast(35f)
+        if (verticalGap > maxMergeGap) {
+            return false
+        }
+
+        // Both lines are left-anchored (Incoming bubble lines)
+        val bothLeftAnchored = boxA.left < imageWidth * 0.22f && boxB.left < imageWidth * 0.22f
+        if (bothLeftAnchored) {
+            val leftDiff = abs(boxA.left - boxB.left)
+            if (leftDiff < imageWidth * 0.12f) return true
+        }
+
+        // Both lines are right-anchored (Outgoing bubble lines)
+        val bothRightAnchored = (imageWidth - boxA.right) < imageWidth * 0.22f &&
+                (imageWidth - boxB.right) < imageWidth * 0.22f
+        if (bothRightAnchored) {
+            val rightDiff = abs(boxA.right - boxB.right)
+            if (rightDiff < imageWidth * 0.12f) return true
+        }
+
+        // Shared left margin for multiline incoming message where one line is wide
+        if (boxA.left < imageWidth * 0.15f && boxB.left < imageWidth * 0.15f) {
+            return true
+        }
+
+        // Shared right margin for multiline outgoing message where one line is wide
+        if ((imageWidth - boxA.right) < imageWidth * 0.15f && (imageWidth - boxB.right) < imageWidth * 0.15f) {
+            return true
+        }
+
+        // Fallback: Both centers are on the same half of the screen
+        val sideA = boxA.centerX > imageWidth * 0.5f
+        val sideB = boxB.centerX > imageWidth * 0.5f
+        return sideA == sideB
+    }
+
     private fun buildMessageFromCluster(
         cluster: List<RawTextElement>,
         imageWidth: Int,
-        bitmap: android.graphics.Bitmap? = null
+        bitmap: Bitmap? = null
     ): ChatMessage {
         val rawClusterText = cluster.joinToString(" ") { it.text }
-        val hasDeliveryStatus = rawClusterText.contains("✓") ||
-                rawClusterText.contains("✓✓") ||
-                rawClusterText.contains("√√") ||
-                rawClusterText.contains("Delivered", ignoreCase = true) ||
-                rawClusterText.contains("Read", ignoreCase = true)
+
+        // Strict end-of-bubble delivery status check (avoids matching words in prose like "read" or "delivered")
+        val hasDeliveryStatus = END_OF_MESSAGE_DELIVERY_REGEX.containsMatchIn(rawClusterText)
 
         var mergedText = cluster.joinToString(" ") { it.text.trim() }
             .replace("\\s+".toRegex(), " ")
@@ -149,6 +213,8 @@ object ConversationParser {
 
         // Strip trailing timestamps and checkmarks from chat text (e.g. "Hey! 10:45 AM ✓✓")
         mergedText = mergedText.replace(TRAILING_TIME_CHECKMARK_REGEX, "").trim()
+        // Also strip any standalone trailing checkmarks
+        mergedText = mergedText.replace(TRAILING_CHECKMARK_ONLY_REGEX, "").trim()
 
         val left = cluster.minOf { it.boundingBox.left }
         val top = cluster.minOf { it.boundingBox.top }
@@ -166,55 +232,84 @@ object ConversationParser {
         )
     }
 
-    private fun determineSenderRole(
+    /**
+     * Determines whether a chat bubble is INCOMING (Received) or OUTGOING (Sent).
+     *
+     * Invariant:
+     * - Incoming (received) messages are anchored to the LEFT edge of the screen.
+     * - Outgoing (sent) messages are anchored to the RIGHT edge of the screen.
+     */
+    fun determineSenderRole(
         box: MessageBoundingBox,
         imageWidth: Int,
         hasDeliveryStatus: Boolean = false,
-        bitmap: android.graphics.Bitmap? = null
+        bitmap: Bitmap? = null
     ): SenderRole {
-        // Factor 1: Delivery checkmarks (✓ or ✓✓ or Delivered/Read) are exclusively shown on Outgoing messages
-        if (hasDeliveryStatus) {
-            return SenderRole.OUTGOING
-        }
-
-        // Factor 2: Edge margin ratios
         val leftMargin = box.left / imageWidth.toFloat()
         val rightMargin = (imageWidth - box.right) / imageWidth.toFloat()
 
-        // Factor 3: Bubble background tint from screenshot
+        // Priority 1: Delivery checkmarks strictly on the right half of the screen confirm OUTGOING.
+        // A checkmark on the left half (e.g. an emoji in a received message) does NOT make it outgoing.
+        if (hasDeliveryStatus && rightMargin < 0.25f && leftMargin > 0.15f) {
+            return SenderRole.OUTGOING
+        }
+
+        // Priority 2: Clear Left Anchorage (INCOMING / RECEIVED)
+        // In all messaging apps, incoming messages start on the left (typically 3% to 15% margin).
+        // Even wide multiline incoming messages start on the left.
+        if (leftMargin < 0.16f) {
+            if (leftMargin <= rightMargin || rightMargin > 0.10f) {
+                return SenderRole.INCOMING
+            }
+        }
+
+        // Priority 3: Clear Right Anchorage (OUTGOING / SENT)
+        // Outgoing messages end near the right edge (< 16% margin) and start away from the left edge (> 16%)
+        if (rightMargin < 0.16f && leftMargin > 0.16f) {
+            return SenderRole.OUTGOING
+        }
+
+        // Priority 4: Relative Margin Contrast
+        // If one margin is significantly smaller, the bubble is anchored to that side
+        if (leftMargin < rightMargin * 0.75f) {
+            return SenderRole.INCOMING
+        }
+        if (rightMargin < leftMargin * 0.75f) {
+            return SenderRole.OUTGOING
+        }
+
+        // Priority 5: Center-of-Mass Spatial Threshold
+        if (box.centerX < imageWidth * 0.46f) {
+            return SenderRole.INCOMING
+        }
+        if (box.centerX > imageWidth * 0.54f) {
+            return SenderRole.OUTGOING
+        }
+
+        // Priority 6: Bubble tint tiebreaker for ambiguous messages near the center
         val tint = sampleBubbleTint(box, bitmap)
         if (tint == BubbleTint.OUTGOING_GREEN || tint == BubbleTint.OUTGOING_BLUE) {
             return SenderRole.OUTGOING
         }
 
-        // Factor 4: Edge proximity and margin contrast
-        // Incoming messages are tightly anchored to the left (small leftMargin, larger rightMargin)
-        // Outgoing messages are tightly anchored to the right (small rightMargin, larger leftMargin)
-        return when {
-            rightMargin < 0.14f && leftMargin > 0.16f -> SenderRole.OUTGOING
-            leftMargin < 0.14f && rightMargin > 0.16f -> SenderRole.INCOMING
-            leftMargin < rightMargin * 0.70f -> SenderRole.INCOMING
-            rightMargin < leftMargin * 0.70f -> SenderRole.OUTGOING
-            box.centerX > imageWidth * 0.52f -> SenderRole.OUTGOING
-            box.centerX < imageWidth * 0.48f -> SenderRole.INCOMING
-            else -> SenderRole.UNKNOWN
-        }
+        // Default fallback: left half = INCOMING, right half = OUTGOING
+        return if (box.centerX <= imageWidth * 0.50f) SenderRole.INCOMING else SenderRole.OUTGOING
     }
 
-    private fun sampleBubbleTint(box: MessageBoundingBox, bitmap: android.graphics.Bitmap?): BubbleTint {
+    private fun sampleBubbleTint(box: MessageBoundingBox, bitmap: Bitmap?): BubbleTint {
         if (bitmap == null || bitmap.isRecycled) return BubbleTint.UNKNOWN
         try {
             val bmpWidth = bitmap.width
             val bmpHeight = bitmap.height
 
-            // Sample pixels slightly outside the left/right edges of the text
-            val sampleX = (box.left.toInt() - 6).coerceIn(0, bmpWidth - 1)
+            // Sample slightly inside the bubble content area to avoid wallpaper artifacts
+            val sampleX = (box.centerX.toInt()).coerceIn(0, bmpWidth - 1)
             val sampleY = (box.centerY.toInt()).coerceIn(0, bmpHeight - 1)
             val pixel = bitmap.getPixel(sampleX, sampleY)
 
-            val r = android.graphics.Color.red(pixel)
-            val g = android.graphics.Color.green(pixel)
-            val b = android.graphics.Color.blue(pixel)
+            val r = Color.red(pixel)
+            val g = Color.green(pixel)
+            val b = Color.blue(pixel)
 
             // WhatsApp outgoing green tint (#dcf8c6)
             if (g > r + 15 && g > b + 25) {
@@ -235,10 +330,16 @@ object ConversationParser {
         }
     }
 
-    private fun isSameSide(boxA: MessageBoundingBox, boxB: MessageBoundingBox, imageWidth: Int): Boolean {
-        val sideA = boxA.centerX > imageWidth * 0.5f
-        val sideB = boxB.centerX > imageWidth * 0.5f
-        return sideA == sideB
+    private fun isSystemBanner(text: String, box: MessageBoundingBox, imageWidth: Int): Boolean {
+        val lower = text.lowercase().trim()
+        val containsBannerKeyword = SYSTEM_BANNER_KEYWORDS.any { lower.contains(it) }
+        if (!containsBannerKeyword) return false
+
+        // System banners are horizontally centered across the screen
+        val leftMargin = box.left / imageWidth.toFloat()
+        val rightMargin = (imageWidth - box.right) / imageWidth.toFloat()
+        val isRoughlyCentered = abs(leftMargin - rightMargin) < 0.15f
+        return isRoughlyCentered
     }
 
     fun isSystemNoise(text: String): Boolean {
@@ -249,7 +350,7 @@ object ConversationParser {
         val lower = trimmed.lowercase()
         if (NOISE_WORDS.contains(lower)) return true
 
-        // Filter out internal UI strings if screen capture captured Wise Chat's own activity
+        // Filter out internal UI strings if screen capture captured RizzWise's own overlay
         for (noise in APP_INTERNAL_UI_NOISE) {
             if (lower == noise || lower.startsWith("$noise ") || lower.contains(noise)) {
                 return true

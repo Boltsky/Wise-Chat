@@ -522,8 +522,7 @@ fun OverlayPanelContent(
                 // --- CONVERSATION RECOGNIZED ---
                 val targetMsg = conversationContext.resolvedTargetMessage
                 val messagesList = conversationContext.messages
-                val receivedMessages = messagesList.filter { it.sender == SenderRole.INCOMING }
-                val displayMessages = if (receivedMessages.isNotEmpty()) receivedMessages else messagesList
+                val displayMessages = messagesList
 
                 // Target Message Display Card
                 Card(
@@ -664,7 +663,7 @@ fun OverlayPanelContent(
                             .padding(vertical = 8.dp)
                     ) {
                         Text(
-                            text = "Select a received message to reply to:",
+                            text = "Select a message to reply to (received messages recommended):",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -707,15 +706,23 @@ fun OverlayPanelContent(
                                             modifier = Modifier.weight(1f),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            val isIncoming = msg.sender == SenderRole.INCOMING
+                                            val badgeColor = if (isIncoming) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                            val badgeText = if (msg.hasMediaOrSticker) {
+                                                if (isIncoming) "Them 🖼️" else "You 🖼️"
+                                            } else {
+                                                if (isIncoming) "Them" else "You"
+                                            }
+
                                             Surface(
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                color = badgeColor.copy(alpha = 0.15f),
                                                 shape = RoundedCornerShape(4.dp)
                                             ) {
                                                 Text(
-                                                    text = if (msg.hasMediaOrSticker) "Them 🖼️" else "Them",
+                                                    text = badgeText,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.primary,
+                                                    color = badgeColor,
                                                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                                 )
                                             }

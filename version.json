@@ -1,13 +1,13 @@
 {
-  "versionCode": 3,
-  "versionName": "1.3.0",
-  "commitSha": "ebec0d8",
-  "releaseTitle": "v1.3.0 - High-Speed Edge Update Sync & RizzWise Charisma Enhancements",
-  "releaseNotes": "• Dual update endpoints: High-speed edge CDN (awake-zephyr-d9x5.here.now) + GitHub Releases\n• Automatic failover between release servers\n• Enhanced update detection and background downloader\n• Pick-up lines & conversation starters library refinements\n• Stability and performance improvements",
+  "versionCode": 4,
+  "versionName": "1.4.0",
+  "commitSha": "ab5b797",
+  "releaseTitle": "v1.4.0 - Enhanced Received Message Detection & Accuracy Fix",
+  "releaseNotes": "• Fixed received message detection (no longer mistakes received messages for sent messages)\n• Improved multiline chat bubble clustering\n• Fixed delivery checkmark false positives\n• High-speed Edge CDN update streaming (awake-zephyr-d9x5.here.now) + GitHub Releases fallback\n• Overlay message picker shows all captured messages with Them/You badges\n• Performance and OCR accuracy optimizations",
   "downloadUrl": "https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk",
   "backupDownloadUrl": "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk",
   "githubReleaseUrl": "https://github.com/Boltsky/Wise-Chat",
   "forceUpdate": false,
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-05T14:30:00Z"
+  "publishedAt": "2026-11-25T14:35:00Z"
 }

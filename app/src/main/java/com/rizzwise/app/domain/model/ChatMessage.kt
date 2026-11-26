@@ -37,7 +37,10 @@ data class ConversationContext(
     val screenshotBase64: String? = null
 ) {
     val resolvedTargetMessage: ChatMessage?
-        get() = targetMessage ?: messages.lastOrNull { it.sender == SenderRole.INCOMING } ?: messages.lastOrNull()
+        get() = targetMessage
+            ?: messages.lastOrNull { it.sender == SenderRole.INCOMING }
+            ?: messages.lastOrNull { it.sender != SenderRole.OUTGOING }
+            ?: messages.lastOrNull()
 
     fun withTarget(messageId: String): ConversationContext {
         val updated = messages.map { it.copy(isTarget = it.id == messageId) }

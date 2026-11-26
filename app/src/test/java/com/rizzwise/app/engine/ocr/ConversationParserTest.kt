@@ -55,6 +55,101 @@ class ConversationParserTest {
     }
 
     @Test
+    fun `test wide incoming message is not dropped as full width banner and correctly classified as INCOMING`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        // Wide incoming message taking up 85% of screen width (e.g. 50f to 960f)
+        val wideIncomingElement = RawTextElement(
+            text = "I was thinking we could try that new Italian restaurant downtown, let me know if that works for you!",
+            boundingBox = MessageBoundingBox(left = 50f, top = 400f, right = 960f, bottom = 480f)
+        )
+
+        val elements = listOf(wideIncomingElement)
+        val context = ConversationParser.parseConversation(elements, screenWidth, screenHeight)
+
+        assertEquals(1, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals(wideIncomingElement.text, context.targetMessage?.text)
+        assertTrue(context.messages[0].isTarget)
+    }
+
+    @Test
+    fun `test incoming message containing word read or delivered is classified as INCOMING`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        // Received message containing the word "read" and "delivered" in prose
+        val incomingWithProse = RawTextElement(
+            text = "Did you read the article I sent? The package was delivered earlier today.",
+            boundingBox = MessageBoundingBox(left = 60f, top = 350f, right = 850f, bottom = 430f)
+        )
+
+        val elements = listOf(incomingWithProse)
+        val context = ConversationParser.parseConversation(elements, screenWidth, screenHeight)
+
+        assertEquals(1, context.messages.size)
+        // Must NOT be falsely marked OUTGOING just because "read" or "delivered" appears in prose
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals(context.messages[0].id, context.targetMessage?.id)
+    }
+
+    @Test
+    fun `test multiline incoming message with varying line widths clusters into single INCOMING bubble`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        // Line 1: Wide line
+        val line1 = RawTextElement(
+            text = "Hey! I tried calling you earlier but your phone was unreachable.",
+            boundingBox = MessageBoundingBox(left = 55f, top = 500f, right = 980f, bottom = 540f)
+        )
+        // Line 2: Short line
+        val line2 = RawTextElement(
+            text = "Call me back when you're free!",
+            boundingBox = MessageBoundingBox(left = 55f, top = 545f, right = 420f, bottom = 585f)
+        )
+
+        val elements = listOf(line1, line2)
+        val context = ConversationParser.parseConversation(elements, screenWidth, screenHeight)
+
+        assertEquals(1, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals("Hey! I tried calling you earlier but your phone was unreachable. Call me back when you're free!", context.messages[0].text)
+        assertEquals(context.messages[0].id, context.targetMessage?.id)
+    }
+
+    @Test
+    fun `test conversation ending with sent message still selects latest received message as target`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        // 1. Received message from them
+        val themMessage = RawTextElement(
+            text = "Are you coming to the party tonight?",
+            boundingBox = MessageBoundingBox(left = 50f, top = 300f, right = 550f, bottom = 360f)
+        )
+
+        // 2. Sent message from you at the end of the chat
+        val youMessage = RawTextElement(
+            text = "Yeah, I'll be there in 20 minutes! 10:45 PM ✓✓",
+            boundingBox = MessageBoundingBox(left = 500f, top = 420f, right = 1030f, bottom = 480f)
+        )
+
+        val elements = listOf(themMessage, youMessage)
+        val context = ConversationParser.parseConversation(elements, screenWidth, screenHeight)
+
+        assertEquals(2, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals(SenderRole.OUTGOING, context.messages[1].sender)
+
+        // Target should be the received message from Them ("Are you coming to the party tonight?"), NOT your sent reply!
+        assertEquals("Are you coming to the party tonight?", context.targetMessage?.text)
+        assertTrue(context.messages[0].isTarget)
+        assertFalse(context.messages[1].isTarget)
+    }
+
+    @Test
     fun `test noise elements are filtered out`() {
         val screenWidth = 1080
         val screenHeight = 2400
