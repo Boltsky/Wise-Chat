@@ -1,13 +1,13 @@
 {
-  "versionCode": 6,
-  "versionName": "1.5.1",
-  "commitSha": "a201043",
-  "releaseTitle": "v1.5.1 - Screen Capture Timeout Fix & Universal Left-Side Message Capture",
-  "releaseNotes": "• Fixed 'Screen capture timed out waiting for frame' by caching the latest VirtualDisplay frame for static chat screens\n• Fixed wide left-aligned received messages (with or without profile avatars) across WhatsApp, Instagram, Messenger, Tinder, Bumble & Hinge\n• Cancellable frame capture watchdogs prevent stale timeout errors",
+  "versionCode": 7,
+  "versionName": "1.5.2",
+  "commitSha": "9046f89",
+  "releaseTitle": "v1.5.2 - Tinder/Chat Input Bar Filter & True In-App Update Installer",
+  "releaseNotes": "• Filtered out chat input bar UI ('GIF', 'Message..', 'Message...') and day/time headers ('Wednesday 7:02 pm', 'Today 2:16 pm', 'Sent')\n• Fixed in-app update to download directly into app cache with live progress and launch the installer inside the app instead of leaving a separate APK in Downloads",
   "downloadUrl": "https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk",
   "backupDownloadUrl": "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk",
   "githubReleaseUrl": "https://github.com/Boltsky/Wise-Chat",
   "forceUpdate": false,
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-26T07:55:00Z"
+  "publishedAt": "2026-11-26T11:45:00Z"
 }

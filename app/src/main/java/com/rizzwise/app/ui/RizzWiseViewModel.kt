@@ -45,6 +45,7 @@ data class RizzWiseUiState(
     val showUpdateDialog: Boolean = false,
     val isUpdateBannerDismissed: Boolean = false,
     val isDownloadingUpdate: Boolean = false,
+    val updateDownloadProgress: Int? = null,
     val updateCheckMessage: String? = null,
     val autoUpdateEnabled: Boolean = true,
     val updateChannel: UpdateChannel = UpdateChannel.STABLE,
@@ -515,15 +516,44 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
 
     fun downloadAndInstallUpdate(context: android.content.Context) {
         val info = _uiState.value.updateInfo ?: return
-        _uiState.update { it.copy(isDownloadingUpdate = true) }
-        AppUpdateDownloader.downloadAndInstall(
-            context = context,
-            downloadUrl = info.downloadUrl,
-            versionName = info.remoteVersionName,
-            onDownloadStarted = {
-                _uiState.update { it.copy(isDownloadingUpdate = false, showUpdateDialog = false) }
+        if (_uiState.value.isDownloadingUpdate) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isDownloadingUpdate = true,
+                    updateDownloadProgress = 0,
+                    errorMessage = null
+                )
             }
-        )
+
+            val result = AppUpdateDownloader.downloadAndInstallInApp(
+                context = context,
+                downloadUrl = info.downloadUrl,
+                versionName = info.remoteVersionName,
+                onProgress = { percent ->
+                    _uiState.update { it.copy(updateDownloadProgress = percent) }
+                }
+            )
+
+            result.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        isDownloadingUpdate = false,
+                        updateDownloadProgress = null,
+                        showUpdateDialog = false
+                    )
+                }
+            }.onFailure { ex ->
+                _uiState.update {
+                    it.copy(
+                        isDownloadingUpdate = false,
+                        updateDownloadProgress = null,
+                        errorMessage = ex.localizedMessage ?: "In-app update download failed."
+                    )
+                }
+            }
+        }
     }
 
     fun openUpdateInBrowser(context: android.content.Context) {

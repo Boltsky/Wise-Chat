@@ -754,6 +754,7 @@ fun SettingsScreen(
         UpdateDialog(
             updateInfo = uiState.updateInfo,
             isDownloading = uiState.isDownloadingUpdate,
+            downloadProgress = uiState.updateDownloadProgress,
             onUpdateNow = onUpdateNow,
             onOpenInBrowser = onOpenUpdateInBrowser,
             onDismiss = onDismissUpdateDialog

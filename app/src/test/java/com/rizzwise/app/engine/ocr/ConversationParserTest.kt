@@ -314,4 +314,34 @@ class ConversationParserTest {
         assertEquals(SenderRole.INCOMING, context.messages[1].sender)
         assertEquals(2, context.resolvedTargetMessages.size)
     }
+
+    @Test
+    fun `test tinder input bar GIF and Message placeholder and day timestamps are filtered out`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        val elements = listOf(
+            RawTextElement("Wednesday 7:02 pm", MessageBoundingBox(380f, 740f, 700f, 780f)),
+            RawTextElement("Hey Di I am good", MessageBoundingBox(160f, 820f, 650f, 880f)),
+            RawTextElement("Today 10:43 am", MessageBoundingBox(400f, 1080f, 680f, 1120f)),
+            RawTextElement("I'm just good.", MessageBoundingBox(280f, 1400f, 1020f, 1460f)),
+            RawTextElement("Sent", MessageBoundingBox(940f, 1740f, 1020f, 1775f)),
+            RawTextElement("Today 2:16 pm", MessageBoundingBox(420f, 1870f, 660f, 1910f)),
+            RawTextElement("I am in Muyenga currently", MessageBoundingBox(160f, 1960f, 780f, 2030f)),
+            RawTextElement("GIF", MessageBoundingBox(50f, 2140f, 130f, 2195f)),
+            RawTextElement("Message..", MessageBoundingBox(180f, 2140f, 400f, 2195f))
+        )
+
+        val context = ConversationParser.parseConversation(elements, screenWidth, screenHeight)
+
+        assertEquals(3, context.messages.size)
+        assertEquals("Hey Di I am good", context.messages[0].text)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals("I'm just good.", context.messages[1].text)
+        assertEquals(SenderRole.OUTGOING, context.messages[1].sender)
+        assertEquals("I am in Muyenga currently", context.messages[2].text)
+        assertEquals(SenderRole.INCOMING, context.messages[2].sender)
+        assertEquals(1, context.resolvedTargetMessages.size)
+        assertEquals("I am in Muyenga currently", context.resolvedTargetText)
+    }
 }

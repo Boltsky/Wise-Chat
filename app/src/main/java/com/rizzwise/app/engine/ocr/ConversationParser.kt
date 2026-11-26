@@ -25,6 +25,14 @@ object ConversationParser {
         "^\\s*([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(AM|PM|am|pm))?(\\s*(✓|✓✓|√√|✔|✔✔|Delivered|Read|Sent|Edited))?\\s*$",
         Pattern.CASE_INSENSITIVE
     )
+    private val DAY_TIME_HEADER_PATTERN = Pattern.compile(
+        "^\\s*(today|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)[,\\s]+([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(am|pm))?\\s*$",
+        Pattern.CASE_INSENSITIVE
+    )
+    private val INPUT_BAR_NOISE_REGEX = Regex(
+        "^(gif|aa|sticker|stickers|emoji|emojis|(type|send|write|reply|add)\\s+(a\\s+)?message\\.*|message\\.{0,4}|reply\\.{1,4})$",
+        RegexOption.IGNORE_CASE
+    )
     private val TRAILING_TIME_CHECKMARK_REGEX = Regex(
         "\\s+([0-1]?[0-9]|2[0-3]):[0-5][0-9](\\s*(AM|PM|am|pm))?(\\s*(✓|✓✓|√√|✔|✔✔|Delivered|Read|Sent|Edited))?\\s*$",
         RegexOption.IGNORE_CASE
@@ -39,7 +47,8 @@ object ConversationParser {
 
     private val NOISE_WORDS = setOf(
         "today", "yesterday", "online", "typing...", "last seen",
-        "type a message", "message...", "send", "chat", "voice call", "video call",
+        "type a message", "message...", "message..", "message", "gif", "send", "sent",
+        "delivered", "read", "seen", "sending...", "chat", "voice call", "video call",
         "search", "status", "calls", "chats", "camera", "settings"
     )
 
@@ -373,6 +382,8 @@ object ConversationParser {
         if (trimmed.length <= 1) return true
         if (TIMESTAMP_PATTERN.matcher(trimmed).matches()) return true
         if (TIME_WITH_STATUS_PATTERN.matcher(trimmed).matches()) return true
+        if (DAY_TIME_HEADER_PATTERN.matcher(trimmed).matches()) return true
+        if (INPUT_BAR_NOISE_REGEX.matches(trimmed)) return true
         val lower = trimmed.lowercase()
         if (NOISE_WORDS.contains(lower)) return true
 

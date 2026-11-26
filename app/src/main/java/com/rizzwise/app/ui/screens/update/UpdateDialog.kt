@@ -28,6 +28,7 @@ import com.rizzwise.app.domain.model.AppUpdateInfo
 fun UpdateDialog(
     updateInfo: AppUpdateInfo,
     isDownloading: Boolean = false,
+    downloadProgress: Int? = null,
     onUpdateNow: () -> Unit,
     onOpenInBrowser: () -> Unit,
     onDismiss: () -> Unit
@@ -187,7 +188,12 @@ fun UpdateDialog(
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Starting Download...")
+                        val progressText = if (downloadProgress != null && downloadProgress > 0) {
+                            "Downloading Update... $downloadProgress%"
+                        } else {
+                            "Downloading Update..."
+                        }
+                        Text(progressText)
                     } else {
                         Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
