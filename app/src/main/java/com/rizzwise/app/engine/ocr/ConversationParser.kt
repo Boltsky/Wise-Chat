@@ -261,24 +261,37 @@ object ConversationParser {
         val leftMargin = box.left / imageWidth.toFloat()
         val rightMargin = (imageWidth - box.right) / imageWidth.toFloat()
 
-        // Priority 1: Delivery checkmarks strictly on the right half of the screen confirm OUTGOING.
-        // A checkmark on the left half (e.g. an emoji in a received message) does NOT make it outgoing.
-        if (hasDeliveryStatus && rightMargin < 0.25f && leftMargin > 0.20f) {
+        // Priority 1: Delivery checkmarks strictly on the right side confirm OUTGOING.
+        if (hasDeliveryStatus && rightMargin < 0.25f && leftMargin > 0.16f) {
             return SenderRole.OUTGOING
         }
 
-        // Priority 2: Clear Left Anchorage (INCOMING / RECEIVED)
-        // In messaging apps, incoming messages start on the left (3%–15% margin, or 15%–24% with left avatar).
-        // Even wide multiline incoming messages start on the left.
-        if (leftMargin < 0.24f) {
-            if (leftMargin <= rightMargin * 1.15f || rightMargin > 0.12f) {
+        // Priority 2: Left-anchored messages are INCOMING (received) across messaging platforms
+        // (leftMargin < 0.16f without avatar, or 0.16f..0.25f with left-side profile avatar).
+        if (leftMargin < 0.16f) {
+            if (rightMargin < 0.10f) {
+                val tint = sampleBubbleTint(box, bitmap)
+                if (tint == BubbleTint.OUTGOING_GREEN || tint == BubbleTint.OUTGOING_BLUE) {
+                    return SenderRole.OUTGOING
+                }
+            }
+            return SenderRole.INCOMING
+        }
+
+        if (leftMargin < 0.25f) {
+            if (rightMargin > 0.16f) {
                 return SenderRole.INCOMING
             }
+            // Wide bubble starting in avatar-offset zone (0.16..0.25): check outgoing color tint
+            val tint = sampleBubbleTint(box, bitmap)
+            if (tint == BubbleTint.OUTGOING_GREEN || tint == BubbleTint.OUTGOING_BLUE) {
+                return SenderRole.OUTGOING
+            }
+            return SenderRole.INCOMING
         }
 
         // Priority 3: Clear Right Anchorage (OUTGOING / SENT)
-        // Outgoing messages end near the right edge (< 16% margin) and start away from the left edge (> 24%)
-        if (rightMargin < 0.16f && leftMargin > 0.24f) {
+        if (rightMargin < 0.22f) {
             return SenderRole.OUTGOING
         }
 

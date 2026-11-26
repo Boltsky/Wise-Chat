@@ -46,6 +46,9 @@ class ScreenCaptureService : Service() {
 
     @Volatile
     private var pendingFrameRequest = false
+    private var latestHeldImage: Image? = null
+    private var fallbackRunnable: Runnable? = null
+    private var timeoutRunnable: Runnable? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -144,27 +147,10 @@ class ScreenCaptureService : Service() {
         currentHeight = metrics.heightPixels
         currentDensity = metrics.densityDpi
 
+        latestHeldImage?.close()
+        latestHeldImage = null
         imageReader?.close()
-        imageReader = ImageReader.newInstance(currentWidth, currentHeight, PixelFormat.RGBA_8888, 2).apply {
-            setOnImageAvailableListener({ reader ->
-                if (pendingFrameRequest) {
-                    val image = try {
-                        reader.acquireLatestImage() ?: reader.acquireNextImage()
-                    } catch (_: Exception) {
-                        null
-                    }
-                    if (image != null) {
-                        pendingFrameRequest = false
-                        extractAndEmitBitmap(image)
-                    }
-                } else {
-                    // Drain buffer queue so it never overflows
-                    try {
-                        reader.acquireLatestImage()?.close()
-                    } catch (_: Exception) {}
-                }
-            }, handler)
-        }
+        imageReader = createImageReader(currentWidth, currentHeight)
 
         virtualDisplay?.release()
         virtualDisplay = mediaProjection?.createVirtualDisplay(
@@ -190,29 +176,44 @@ class ScreenCaptureService : Service() {
             currentHeight = metrics.heightPixels
             currentDensity = metrics.densityDpi
 
+            latestHeldImage?.close()
+            latestHeldImage = null
             imageReader?.close()
-            imageReader = ImageReader.newInstance(currentWidth, currentHeight, PixelFormat.RGBA_8888, 2).apply {
-                setOnImageAvailableListener({ reader ->
-                    if (pendingFrameRequest) {
-                        val image = try {
-                            reader.acquireLatestImage() ?: reader.acquireNextImage()
-                        } catch (_: Exception) {
-                            null
-                        }
-                        if (image != null) {
-                            pendingFrameRequest = false
-                            extractAndEmitBitmap(image)
-                        }
-                    } else {
-                        try {
-                            reader.acquireLatestImage()?.close()
-                        } catch (_: Exception) {}
-                    }
-                }, handler)
-            }
+            imageReader = createImageReader(currentWidth, currentHeight)
             virtualDisplay?.resize(currentWidth, currentHeight, currentDensity)
             virtualDisplay?.surface = imageReader?.surface
         }
+    }
+
+    private fun createImageReader(width: Int, height: Int): ImageReader {
+        return ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 4).apply {
+            setOnImageAvailableListener({ reader ->
+                val image = try {
+                    reader.acquireLatestImage() ?: reader.acquireNextImage()
+                } catch (_: Exception) {
+                    null
+                } ?: return@setOnImageAvailableListener
+
+                if (pendingFrameRequest) {
+                    pendingFrameRequest = false
+                    cancelPendingRunnables()
+                    latestHeldImage?.close()
+                    latestHeldImage = null
+                    extractAndEmitBitmap(image)
+                } else {
+                    // Hold the latest frame so static screens never time out waiting for a new draw
+                    latestHeldImage?.close()
+                    latestHeldImage = image
+                }
+            }, handler)
+        }
+    }
+
+    private fun cancelPendingRunnables() {
+        fallbackRunnable?.let { handler.removeCallbacks(it) }
+        fallbackRunnable = null
+        timeoutRunnable?.let { handler.removeCallbacks(it) }
+        timeoutRunnable = null
     }
 
     private fun requestFrame() {
@@ -222,6 +223,7 @@ class ScreenCaptureService : Service() {
         }
 
         checkDisplayMetricsChange()
+        cancelPendingRunnables()
 
         val reader = imageReader ?: return
         val immediateImage = try {
@@ -232,18 +234,41 @@ class ScreenCaptureService : Service() {
 
         if (immediateImage != null) {
             pendingFrameRequest = false
+            latestHeldImage?.close()
+            latestHeldImage = null
             extractAndEmitBitmap(immediateImage)
-        } else {
-            // Wait for next frame
-            pendingFrameRequest = true
-            // Timeout watchdog
-            handler.postDelayed({
-                if (pendingFrameRequest) {
-                    pendingFrameRequest = false
-                    notifyCaptureError("Screen capture timed out waiting for frame.")
-                }
-            }, 3000)
+            return
         }
+
+        pendingFrameRequest = true
+
+        // Wait briefly (300ms) for a fresh post-transition frame; if screen is static, use held frame
+        if (latestHeldImage != null) {
+            val fallback = Runnable {
+                if (pendingFrameRequest) {
+                    val held = latestHeldImage
+                    latestHeldImage = null
+                    if (held != null) {
+                        pendingFrameRequest = false
+                        cancelPendingRunnables()
+                        extractAndEmitBitmap(held)
+                    }
+                }
+            }
+            fallbackRunnable = fallback
+            handler.postDelayed(fallback, 300)
+        }
+
+        // Timeout watchdog
+        val timeout = Runnable {
+            if (pendingFrameRequest) {
+                pendingFrameRequest = false
+                cancelPendingRunnables()
+                notifyCaptureError("Screen capture timed out waiting for frame.")
+            }
+        }
+        timeoutRunnable = timeout
+        handler.postDelayed(timeout, 4000)
     }
 
     private fun extractAndEmitBitmap(image: Image) {
@@ -278,7 +303,10 @@ class ScreenCaptureService : Service() {
     private fun cleanupAndStop() {
         isSessionReady = false
         pendingFrameRequest = false
+        cancelPendingRunnables()
         try {
+            latestHeldImage?.close()
+            latestHeldImage = null
             virtualDisplay?.release()
             virtualDisplay = null
             imageReader?.close()

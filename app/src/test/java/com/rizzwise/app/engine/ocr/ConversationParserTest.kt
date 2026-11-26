@@ -286,4 +286,32 @@ class ConversationParserTest {
         assertEquals(3, context.resolvedTargetMessages.size)
         assertEquals("Heyyy\nAre you free tonight?\n??", context.resolvedTargetText)
     }
+
+    @Test
+    fun `test very wide left-aligned received messages with and without avatar are INCOMING`() {
+        val screenWidth = 1080
+        val screenHeight = 2400
+
+        // Very wide received message without avatar: left=86 (8%), right=1026 (margin 5%)
+        val wideNoAvatar = RawTextElement(
+            text = "Honestly I had such a long day at work today you wouldn't even believe it",
+            boundingBox = MessageBoundingBox(left = 86f, top = 400f, right = 1026f, bottom = 460f)
+        )
+        // Very wide received message with avatar: left=216 (20%), right=994 (margin 8%)
+        val wideWithAvatar = RawTextElement(
+            text = "Anyway let me know when you're free this weekend so we can catch up!",
+            boundingBox = MessageBoundingBox(left = 216f, top = 560f, right = 994f, bottom = 620f)
+        )
+
+        val context = ConversationParser.parseConversation(
+            listOf(wideNoAvatar, wideWithAvatar),
+            screenWidth,
+            screenHeight
+        )
+
+        assertEquals(2, context.messages.size)
+        assertEquals(SenderRole.INCOMING, context.messages[0].sender)
+        assertEquals(SenderRole.INCOMING, context.messages[1].sender)
+        assertEquals(2, context.resolvedTargetMessages.size)
+    }
 }
