@@ -24,7 +24,10 @@ class OpenAiCompatibleProvider(
         withContext(Dispatchers.IO) {
             try {
                 val systemPrompt = PromptBuilder.buildSystemInstruction(params.styleOptions, params.customPreset)
-                val userContent = PromptBuilder.buildUserMessage(params.conversationContext)
+                val userContent = PromptBuilder.buildUserMessage(
+                    context = params.conversationContext,
+                    isVisionSupported = false
+                )
 
                 val requestJson = JSONObject().apply {
                     put("model", config.model)

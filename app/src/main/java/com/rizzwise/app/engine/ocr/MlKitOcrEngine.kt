@@ -57,13 +57,13 @@ class MlKitOcrEngine {
                 }
             }
 
-            val screenshotBase64 = compressBitmapToBase64(bitmap)
+            val screenshotBase64 = compressBitmapToBase64(bitmap, maxDimension = 1280)
 
             if (elements.isEmpty()) {
-                // If no text was recognized, but the screen has visual content (e.g. an image or sticker),
-                // create a media message so multimodal AI can still analyze and reply to the image/sticker!
+                // No text recognized (e.g. photo, sticker, or visual-only profile/story):
+                // pass the full screenshot straight to multimodal Vision AI.
                 val mediaMessage = com.rizzwise.app.domain.model.ChatMessage(
-                    text = "[Sticker / Image sent]",
+                    text = "[Full Screenshot Capture]",
                     sender = com.rizzwise.app.domain.model.SenderRole.INCOMING,
                     isTarget = true,
                     hasMediaOrSticker = true
@@ -71,7 +71,8 @@ class MlKitOcrEngine {
                 val mediaContext = ConversationContext(
                     messages = listOf(mediaMessage),
                     targetMessage = mediaMessage,
-                    screenshotBase64 = screenshotBase64
+                    screenshotBase64 = screenshotBase64,
+                    isVisionPrimary = true
                 )
                 return Result.success(mediaContext)
             }
@@ -84,8 +85,21 @@ class MlKitOcrEngine {
             )
 
             if (rawContext.messages.isEmpty()) {
-                return Result.failure(
-                    IllegalStateException("No chat messages were detected on screen. Please make sure your messaging app (WhatsApp, Telegram, etc.) is open with messages visible, then tap Re-scan.")
+                // Even if OCR filtered all text (e.g., dating profile photo/bio or story),
+                // allow Vision AI to analyze the full screenshot directly.
+                val visualMessage = com.rizzwise.app.domain.model.ChatMessage(
+                    text = "[Full Screenshot Capture]",
+                    sender = com.rizzwise.app.domain.model.SenderRole.INCOMING,
+                    isTarget = true,
+                    hasMediaOrSticker = true
+                )
+                return Result.success(
+                    ConversationContext(
+                        messages = listOf(visualMessage),
+                        targetMessage = visualMessage,
+                        screenshotBase64 = screenshotBase64,
+                        isVisionPrimary = true
+                    )
                 )
             }
 

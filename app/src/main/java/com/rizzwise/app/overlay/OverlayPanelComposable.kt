@@ -543,7 +543,10 @@ fun OverlayPanelContent(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                val isVisionMode = conversationContext.isVisionPrimary &&
+                                    !conversationContext.screenshotBase64.isNullOrBlank()
                                 val roleLabel = when {
+                                    isVisionMode -> "Them (Screenshot Vision)"
                                     targetMessages.size > 1 && targetMsg?.sender == SenderRole.INCOMING ->
                                         "Them (Received • ${targetMessages.size} msgs)"
                                     targetMsg?.sender == SenderRole.INCOMING -> "Them (Received)"

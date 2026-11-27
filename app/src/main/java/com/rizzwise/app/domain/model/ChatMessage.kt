@@ -34,7 +34,9 @@ data class ConversationContext(
     val targetMessage: ChatMessage? = null,
     val detectedLanguage: String = "Auto",
     val appSourceHint: String? = null,
-    val screenshotBase64: String? = null
+    val screenshotBase64: String? = null,
+    val isVisionPrimary: Boolean = true,
+    val visionDetectedTarget: String? = null
 ) {
     val resolvedTargetMessage: ChatMessage?
         get() = targetMessage
@@ -50,9 +52,13 @@ data class ConversationContext(
         }
 
     val resolvedTargetText: String
-        get() = resolvedTargetMessages
-            .joinToString("\n") { it.text }
-            .ifBlank { resolvedTargetMessage?.text.orEmpty() }
+        get() = if (isVisionPrimary && !visionDetectedTarget.isNullOrBlank()) {
+            visionDetectedTarget
+        } else {
+            resolvedTargetMessages
+                .joinToString("\n") { it.text }
+                .ifBlank { resolvedTargetMessage?.text.orEmpty() }
+        }
 
     val latestIncomingStreak: List<ChatMessage>
         get() {
@@ -68,14 +74,24 @@ data class ConversationContext(
     fun withTarget(messageId: String): ConversationContext {
         val updated = messages.map { it.copy(isTarget = it.id == messageId) }
         val target = updated.firstOrNull { it.id == messageId }
-        return copy(messages = updated, targetMessage = target)
+        return copy(
+            messages = updated,
+            targetMessage = target,
+            isVisionPrimary = false,
+            visionDetectedTarget = null
+        )
     }
 
     fun withTargetStreak(): ConversationContext {
         val streakIds = latestIncomingStreak.map { it.id }.toSet()
         if (streakIds.isEmpty()) return this
         val updated = messages.map { it.copy(isTarget = it.id in streakIds) }
-        return copy(messages = updated, targetMessage = updated.lastOrNull { it.isTarget })
+        return copy(
+            messages = updated,
+            targetMessage = updated.lastOrNull { it.isTarget },
+            isVisionPrimary = false,
+            visionDetectedTarget = null
+        )
     }
 
     fun updateMessageText(messageId: String, newText: String): ConversationContext {

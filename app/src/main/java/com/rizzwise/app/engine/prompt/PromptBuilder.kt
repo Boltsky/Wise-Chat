@@ -93,7 +93,44 @@ You must respond with valid JSON matching this exact structure:
 """.trimIndent()
     }
 
-    fun buildUserMessage(context: ConversationContext): String {
+    fun buildUserMessage(
+        context: ConversationContext,
+        isVisionSupported: Boolean = true
+    ): String {
+        val useVisionFirst = isVisionSupported &&
+            context.isVisionPrimary &&
+            !context.screenshotBase64.isNullOrBlank()
+
+        if (useVisionFirst) {
+            val ocrHint = if (context.messages.isNotEmpty() &&
+                context.messages.none { it.text == "[Full Screenshot Capture]" }
+            ) {
+                val hintLines = context.messages.joinToString("\n") { msg ->
+                    val speaker = when (msg.sender) {
+                        SenderRole.INCOMING -> "Them"
+                        SenderRole.OUTGOING -> "You"
+                        SenderRole.UNKNOWN -> "Participant"
+                    }
+                    "$speaker: ${msg.text}"
+                }
+                "\n\n<<<OPTIONAL_OCR_TEXT_HINT (secondary only — trust the screenshot image if anything differs)>>>\n$hintLines\n<<<END_OCR_TEXT_HINT>>>"
+            } else ""
+
+            return """
+PRIMARY INSTRUCTION — FULL SCREENSHOT VISION ANALYSIS:
+Read the attached full-screen screenshot directly as the primary source of truth.
+1. If this is a messaging chat (WhatsApp, Instagram, Tinder, Bumble, Hinge, Messenger, Telegram, iMessage, SMS, etc.):
+   - Visually distinguish who sent each bubble by layout, alignment, avatars, and colors (typically left-side / avatar-side bubbles are 'Them' [received], right-side / checkmark bubbles are 'You' [sent]).
+   - Ignore app UI chrome (status bar, header, timestamps, 'Message...' input box, 'GIF' / camera / mic buttons).
+   - Identify the latest received message(s) from 'Them' (including if 'Them' sent a multi-message streak or a sticker/photo/meme).
+   - Put the exact received message(s) you are replying to in JSON "target_message".
+2. If this is a dating profile (bio, prompt, photo) or social story (Instagram/Snapchat Story) rather than a chat:
+   - Identify the most interesting hook/prompt/visual detail in the screenshot, put a brief summary of it in "target_message", and craft natural, charismatic replies/openers for 'You' to send to 'Them'.
+
+Generate diverse, ready-to-send reply suggestions for 'You' that harmonize with the entire visible conversation or profile.$ocrHint
+""".trimIndent()
+        }
+
         val targetMessages = context.resolvedTargetMessages
         val target = context.resolvedTargetText.ifBlank { "Hello" }
         val isStreak = targetMessages.size > 1

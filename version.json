@@ -1,13 +1,13 @@
 {
-  "versionCode": 7,
-  "versionName": "1.5.2",
-  "commitSha": "9046f89",
-  "releaseTitle": "v1.5.2 - Tinder/Chat Input Bar Filter & True In-App Update Installer",
-  "releaseNotes": "• Filtered out chat input bar UI ('GIF', 'Message..', 'Message...') and day/time headers ('Wednesday 7:02 pm', 'Today 2:16 pm', 'Sent')\n• Fixed in-app update to download directly into app cache with live progress and launch the installer inside the app instead of leaving a separate APK in Downloads",
+  "versionCode": 8,
+  "versionName": "1.6.0",
+  "commitSha": "17788b5",
+  "releaseTitle": "v1.6.0 - Full-Screenshot Vision Mode",
+  "releaseNotes": "• Added Full-Screenshot Vision Mode (enabled by default): sends the full screen capture directly to Gemini/OpenAI/Claude so the AI reads chat bubbles, avatars, stickers, profiles & stories without OCR errors\n• Automatically captures and analyzes dating profiles (Tinder/Hinge/Bumble bios & prompts) and Instagram/Snapchat Stories even when no chat bubbles exist\n• Displays AI-detected target message in the overlay card ('Them (Screenshot Vision)')\n• Added 'Full-Screenshot Vision Mode' toggle in Settings -> Screen Capture & OCR",
   "downloadUrl": "https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk",
   "backupDownloadUrl": "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk",
   "githubReleaseUrl": "https://github.com/Boltsky/Wise-Chat",
   "forceUpdate": false,
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-26T11:45:00Z"
+  "publishedAt": "2026-11-27T09:30:00Z"
 }

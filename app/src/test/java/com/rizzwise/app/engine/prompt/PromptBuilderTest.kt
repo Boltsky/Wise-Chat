@@ -89,6 +89,26 @@ class PromptBuilderTest {
     }
 
     @Test
+    fun `test vision-first prompt uses full screenshot as primary source of truth`() {
+        val m1 = ChatMessage(text = "Heyy", sender = SenderRole.INCOMING, isTarget = true)
+        val context = ConversationContext(
+            messages = listOf(m1),
+            targetMessage = m1,
+            screenshotBase64 = "fakeBase64ImagePayload",
+            isVisionPrimary = true
+        )
+
+        val visionPrompt = PromptBuilder.buildUserMessage(context, isVisionSupported = true)
+        assertTrue(visionPrompt.contains("FULL SCREENSHOT VISION ANALYSIS"))
+        assertTrue(visionPrompt.contains("OPTIONAL_OCR_TEXT_HINT"))
+
+        // Text-only providers should fall back to OCR text prompt
+        val textOnlyPrompt = PromptBuilder.buildUserMessage(context, isVisionSupported = false)
+        assertTrue(textOnlyPrompt.contains("<<<FULL_CONVERSATION_HISTORY>>>"))
+        assertFalse(textOnlyPrompt.contains("FULL SCREENSHOT VISION ANALYSIS"))
+    }
+
+    @Test
     fun `test refinement prompt incorporates conversation context for holistic coherence`() {
         val messages = listOf(
             ChatMessage(text = "Had a crazy day at work today", sender = SenderRole.INCOMING),

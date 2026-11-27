@@ -45,6 +45,7 @@ import com.rizzwise.app.engine.provider.GenerateStartersParams
 import com.rizzwise.app.ui.theme.RizzWiseTheme
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlin.math.hypot
 
 class OverlayService : Service() {
@@ -473,11 +474,17 @@ class OverlayService : Service() {
         showOverlayPanel()
 
         serviceScope.launch {
+            val app = application as RizzWiseApp
+            val visionFirst = try {
+                app.preferencesManager.visionFirstMode.first()
+            } catch (_: Exception) {
+                true
+            }
             val result = ocrEngine.processImage(bitmap)
             isAnalyzing = false
 
             result.onSuccess { context ->
-                currentContext = context
+                currentContext = context.copy(isVisionPrimary = visionFirst)
                 bubbleView?.visualState = BubbleVisualState.SUCCESS
                 generateReplies()
             }.onFailure { ex ->
@@ -529,6 +536,9 @@ class OverlayService : Service() {
             isGenerating = false
 
             result.onSuccess { response ->
+                if (currentContext?.isVisionPrimary == true && response.targetMessage.isNotBlank()) {
+                    currentContext = currentContext?.copy(visionDetectedTarget = response.targetMessage)
+                }
                 suggestions = response.suggestions
                 bubbleView?.visualState = BubbleVisualState.SUCCESS
             }.onFailure { ex ->

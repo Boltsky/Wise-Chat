@@ -38,6 +38,7 @@ class PreferencesManager(private val context: Context) {
         val UPDATE_CHANNEL = stringPreferencesKey("update_channel")
         val LAST_UPDATE_CHECK_TIMESTAMP = longPreferencesKey("last_update_check_timestamp")
         val DISMISSED_UPDATE_VERSION_CODE = intPreferencesKey("dismissed_update_version_code")
+        val VISION_FIRST_MODE = booleanPreferencesKey("vision_first_mode")
     }
 
     val overlayEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -206,5 +207,13 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setDismissedUpdateVersionCode(versionCode: Int) {
         context.dataStore.edit { it[PreferencesKeys.DISMISSED_UPDATE_VERSION_CODE] = versionCode }
+    }
+
+    val visionFirstMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.VISION_FIRST_MODE] ?: true
+    }
+
+    suspend fun setVisionFirstMode(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.VISION_FIRST_MODE] = enabled }
     }
 }

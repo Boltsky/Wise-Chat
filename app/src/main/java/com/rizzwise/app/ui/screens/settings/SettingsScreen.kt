@@ -43,6 +43,7 @@ fun SettingsScreen(
     onNavigateToProviders: () -> Unit,
     onDisconnectProvider: () -> Unit,
     onToggleOverlay: (Boolean) -> Unit,
+    onSetVisionFirstMode: (Boolean) -> Unit = {},
     onClearHistory: () -> Unit,
     onCheckForUpdates: () -> Unit = {},
     onSetAutoUpdate: (Boolean) -> Unit = {},
@@ -312,6 +313,31 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            item {
+                Card(shape = RoundedCornerShape(14.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Full-Screenshot Vision Mode", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Send full screenshot directly to Gemini/OpenAI/Claude so AI reads bubbles, avatars, profiles & stories without OCR errors.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = uiState.visionFirstMode,
+                            onCheckedChange = onSetVisionFirstMode
+                        )
+                    }
+                }
             }
 
             item {

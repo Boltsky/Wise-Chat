@@ -49,7 +49,8 @@ data class RizzWiseUiState(
     val updateCheckMessage: String? = null,
     val autoUpdateEnabled: Boolean = true,
     val updateChannel: UpdateChannel = UpdateChannel.STABLE,
-    val lastUpdateCheckedTime: Long = 0L
+    val lastUpdateCheckedTime: Long = 0L,
+    val visionFirstMode: Boolean = true
 )
 
 class RizzWiseViewModel(application: Application) : AndroidViewModel(application) {
@@ -170,9 +171,10 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
                 if (bitmap != null) {
                     val result = ocrEngine.processImage(bitmap)
                     result.onSuccess { context ->
+                        val visionFirst = _uiState.value.visionFirstMode
                         _uiState.update {
                             it.copy(
-                                conversationContext = context,
+                                conversationContext = context.copy(isVisionPrimary = visionFirst),
                                 isAnalyzingImage = false,
                                 suggestions = emptyList()
                             )
@@ -249,9 +251,17 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
             )
             val result = app.providerCoordinator.generateReplies(params)
             result.onSuccess { response ->
-                _uiState.update {
-                    it.copy(
+                _uiState.update { state ->
+                    val updatedCtx = if (state.conversationContext?.isVisionPrimary == true &&
+                        response.targetMessage.isNotBlank()
+                    ) {
+                        state.conversationContext.copy(visionDetectedTarget = response.targetMessage)
+                    } else {
+                        state.conversationContext
+                    }
+                    state.copy(
                         isGeneratingReplies = false,
+                        conversationContext = updatedCtx,
                         suggestions = response.suggestions
                     )
                 }
@@ -277,9 +287,17 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
             )
             val result = app.providerCoordinator.refineReply(params)
             result.onSuccess { response ->
-                _uiState.update {
-                    it.copy(
+                _uiState.update { state ->
+                    val updatedCtx = if (state.conversationContext?.isVisionPrimary == true &&
+                        response.targetMessage.isNotBlank()
+                    ) {
+                        state.conversationContext.copy(visionDetectedTarget = response.targetMessage)
+                    } else {
+                        state.conversationContext
+                    }
+                    state.copy(
                         isGeneratingReplies = false,
+                        conversationContext = updatedCtx,
                         suggestions = response.suggestions
                     )
                 }
@@ -423,15 +441,17 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
             combine(
                 app.preferencesManager.autoUpdateCheckEnabled,
                 app.preferencesManager.updateChannel,
-                app.preferencesManager.lastUpdateCheckTimestamp
-            ) { autoCheck, channel, lastCheck ->
-                Triple(autoCheck, channel, lastCheck)
-            }.collect { (autoCheck, channel, lastCheck) ->
+                app.preferencesManager.lastUpdateCheckTimestamp,
+                app.preferencesManager.visionFirstMode
+            ) { autoCheck, channel, lastCheck, visionFirst ->
+                listOf(autoCheck, channel, lastCheck, visionFirst)
+            }.collect { values ->
                 _uiState.update {
                     it.copy(
-                        autoUpdateEnabled = autoCheck,
-                        updateChannel = channel,
-                        lastUpdateCheckedTime = lastCheck
+                        autoUpdateEnabled = values[0] as Boolean,
+                        updateChannel = values[1] as UpdateChannel,
+                        lastUpdateCheckedTime = values[2] as Long,
+                        visionFirstMode = values[3] as Boolean
                     )
                 }
             }
@@ -571,6 +591,12 @@ class RizzWiseViewModel(application: Application) : AndroidViewModel(application
     fun setUpdateChannel(channel: UpdateChannel) {
         viewModelScope.launch {
             app.preferencesManager.setUpdateChannel(channel)
+        }
+    }
+
+    fun setVisionFirstMode(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesManager.setVisionFirstMode(enabled)
         }
     }
 }

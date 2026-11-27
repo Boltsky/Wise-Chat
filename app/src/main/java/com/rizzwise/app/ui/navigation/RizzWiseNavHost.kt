@@ -152,6 +152,7 @@ fun RizzWiseNavHost(
                 onNavigateToProviders = { navController.navigate(Routes.PROVIDERS) },
                 onDisconnectProvider = { viewModel.disconnectActiveProvider() },
                 onToggleOverlay = { viewModel.setOverlayEnabled(it) },
+                onSetVisionFirstMode = { viewModel.setVisionFirstMode(it) },
                 onClearHistory = { viewModel.clearAllHistory() },
                 onCheckForUpdates = { viewModel.checkForUpdates(manual = true) },
                 onSetAutoUpdate = { viewModel.setAutoUpdateEnabled(it) },
