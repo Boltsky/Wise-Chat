@@ -138,8 +138,8 @@ class UpdateRepositoryTest {
         assertEquals("RizzWise v1.3.0", info.releaseTitle)
         assertTrue(info.releaseNotes.contains("• Dual update endpoints"))
         assertTrue(info.releaseNotes.contains("• Refined pick-up lines"))
-        assertEquals("https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk", info.downloadUrl)
-        assertEquals("https://awake-zephyr-d9x5.here.now/#rizzwise", info.githubUrl)
+        assertEquals("https://boltsky-release-hub.vercel.app/releases/rizzwise/rizzwise-release.apk", info.downloadUrl)
+        assertEquals("https://boltsky-release-hub.vercel.app/#rizzwise", info.githubUrl)
         assertFalse(info.forceUpdate)
         assertEquals("2026-11-05", info.publishedAt)
     }

@@ -31,12 +31,14 @@ class UpdateRepository(
             val now = System.currentTimeMillis()
 
             // 1. Multi-tiered manifest fetch:
-            //    Tier A: Edge CDN endpoint on here.now (https://awake-zephyr-d9x5.here.now/api/updates/rizzwise/latest.json)
-            //    Tier B: Edge root version.json (https://awake-zephyr-d9x5.here.now/version.json)
-            //    Tier C: GitHub raw repository manifest (https://raw.githubusercontent.com/Boltsky/Wise-Chat/main/version.json)
-            val manifestResult = fetchManifestFromUrl(HERE_NOW_UPDATE_URL)
-                .recoverCatching { fetchManifestFromUrl(HERE_NOW_VERSION_JSON_URL).getOrThrow() }
-                .recoverCatching { fetchManifestFromUrl(RAW_VERSION_JSON_URL).getOrThrow() }
+            //    Tier A: Primary Release Hub on Vercel (https://boltsky-release-hub.vercel.app/api/updates/rizzwise/latest.json)
+            //    Tier B: Vercel root version.json (https://boltsky-release-hub.vercel.app/version.json)
+            //    Tier C: Edge CDN fallback on here.now (https://awake-zephyr-d9x5.here.now/api/updates/rizzwise/latest.json)
+            //    Tier D: GitHub raw repository manifest (https://raw.githubusercontent.com/Boltsky/Wise-Chat/main/version.json)
+            val manifestResult = fetchManifestFromUrl(RELEASE_HUB_UPDATE_URL, RELEASE_HUB_BASE_URL)
+                .recoverCatching { fetchManifestFromUrl(RELEASE_HUB_VERSION_JSON_URL, RELEASE_HUB_BASE_URL).getOrThrow() }
+                .recoverCatching { fetchManifestFromUrl(HERE_NOW_UPDATE_URL, HERE_NOW_BASE_URL).getOrThrow() }
+                .recoverCatching { fetchManifestFromUrl(RAW_VERSION_JSON_URL, RELEASE_HUB_BASE_URL).getOrThrow() }
 
             val remoteInfo = if (manifestResult.isSuccess) {
                 manifestResult.getOrNull()
@@ -89,7 +91,10 @@ class UpdateRepository(
         return clean1.startsWith(clean2) || clean2.startsWith(clean1)
     }
 
-    private fun fetchManifestFromUrl(url: String): Result<AppUpdateInfo> {
+    private fun fetchManifestFromUrl(
+        url: String,
+        baseUrl: String = RELEASE_HUB_BASE_URL
+    ): Result<AppUpdateInfo> {
         return try {
             val request = Request.Builder()
                 .url(url)
@@ -105,7 +110,7 @@ class UpdateRepository(
                 if (body.isEmpty() || body.startsWith("<") || body == "Not found") {
                     return Result.failure(RuntimeException("Invalid non-JSON response from $url"))
                 }
-                val info = parseVersionManifestJson(body)
+                val info = parseVersionManifestJson(body, baseUrl)
                 Result.success(info)
             }
         } catch (e: Exception) {
@@ -134,7 +139,10 @@ class UpdateRepository(
         }
     }
 
-    fun parseVersionManifestJson(jsonString: String): AppUpdateInfo {
+    fun parseVersionManifestJson(
+        jsonString: String,
+        baseUrl: String = RELEASE_HUB_BASE_URL
+    ): AppUpdateInfo {
         val json = JSONObject(jsonString)
         val versionCode = json.optInt("versionCode", 1)
         val versionName = when {
@@ -171,7 +179,7 @@ class UpdateRepository(
         if (downloadUrl.isBlank()) {
             downloadUrl = DEFAULT_DOWNLOAD_URL
         } else if (downloadUrl.startsWith("/")) {
-            downloadUrl = "$HERE_NOW_BASE_URL$downloadUrl"
+            downloadUrl = "$baseUrl$downloadUrl"
         }
 
         // Parse GitHub / Release notes URL
@@ -182,7 +190,7 @@ class UpdateRepository(
         if (githubUrl.isBlank()) {
             githubUrl = GITHUB_REPO_URL
         } else if (githubUrl.startsWith("/")) {
-            githubUrl = "$HERE_NOW_BASE_URL$githubUrl"
+            githubUrl = "$baseUrl$githubUrl"
         }
 
         val forceUpdate = json.optBoolean("forceUpdate", json.optBoolean("mandatory", false))
@@ -232,14 +240,16 @@ class UpdateRepository(
 
     companion object {
         private const val TAG = "UpdateRepository"
+        const val RELEASE_HUB_BASE_URL = "https://boltsky-release-hub.vercel.app"
+        const val RELEASE_HUB_UPDATE_URL = "https://boltsky-release-hub.vercel.app/api/updates/rizzwise/latest.json"
+        const val RELEASE_HUB_VERSION_JSON_URL = "https://boltsky-release-hub.vercel.app/version.json"
+        const val RELEASE_HUB_DOWNLOAD_URL = "https://boltsky-release-hub.vercel.app/releases/rizzwise/rizzwise-release.apk"
         const val HERE_NOW_BASE_URL = "https://awake-zephyr-d9x5.here.now"
         const val HERE_NOW_UPDATE_URL = "https://awake-zephyr-d9x5.here.now/api/updates/rizzwise/latest.json"
-        const val HERE_NOW_VERSION_JSON_URL = "https://awake-zephyr-d9x5.here.now/version.json"
-        const val HERE_NOW_DOWNLOAD_URL = "https://awake-zephyr-d9x5.here.now/releases/rizzwise/rizzwise-release.apk"
         const val RAW_VERSION_JSON_URL = "https://raw.githubusercontent.com/Boltsky/Wise-Chat/main/version.json"
         const val GITHUB_COMMITS_API_URL = "https://api.github.com/repos/Boltsky/Wise-Chat/commits/main"
         const val GITHUB_REPO_URL = "https://github.com/Boltsky/Wise-Chat"
-        const val DEFAULT_DOWNLOAD_URL = HERE_NOW_DOWNLOAD_URL
+        const val DEFAULT_DOWNLOAD_URL = RELEASE_HUB_DOWNLOAD_URL
         const val GITHUB_DOWNLOAD_URL = "https://github.com/Boltsky/Wise-Chat/raw/main/apk/rizzwise-release.apk"
         private const val USER_AGENT = "RizzWise-Android-App"
     }

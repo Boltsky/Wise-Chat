@@ -643,7 +643,7 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Edge CDN: awake-zephyr-d9x5.here.now • Backup: GitHub",
+                            text = "Release Hub: boltsky-release-hub.vercel.app • Backup: GitHub",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )

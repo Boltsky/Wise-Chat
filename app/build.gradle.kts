@@ -22,8 +22,8 @@ android {
         applicationId = "com.rizzwise.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.6.0"
+        versionCode = 9
+        versionName = "1.6.1"
 
         buildConfigField("String", "GIT_COMMIT_HASH", "\"${getGitCommitHash()}\"")
         buildConfigField("Long", "BUILD_TIME", "${System.currentTimeMillis()}L")
